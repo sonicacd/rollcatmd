@@ -1,0 +1,45 @@
+{
+  "name": "rollcat-md",
+  "version": "0.2.0",
+  "description": "rollcat-md — a lightweight Markdown reader and editor for Windows.",
+  "author": "sonicacd",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sonicacd/rollcatmd.git"
+  },
+  "homepage": "https://github.com/sonicacd/rollcatmd",
+  "bugs": {
+    "url": "https://github.com/sonicacd/rollcatmd/issues"
+  },
+  "type": "module",
+  "scripts": {
+    "build:renderer": "vite build --outDir dist-renderer --emptyOutDir",
+    "test": "node --test",
+    "postinstall": "patch-package",
+    "dev:vite": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "dev": "tauri dev",
+    "start": "tauri dev",
+    "dist": "tauri build --no-bundle",
+    "dist:win": "tauri build --no-bundle"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.10.4",
+    "@codemirror/search": "^6.7.1",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.6",
+    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-dialog": "2.7.1",
+    "@tauri-apps/plugin-fs": "2.5.1",
+    "@toast-ui/editor": "3.2.2",
+    "dompurify": "3.4.12"
+  },
+  "overrides": {
+    "dompurify": "3.4.12"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "patch-package": "8.0.1",
+    "vite": "6.4.3"
+  }
+}

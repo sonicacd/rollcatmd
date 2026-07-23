@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "滚猫md",
+  "version": "0.2.0",
+  "identifier": "local.light-markdown-editor",
+  "build": {
+    "beforeDevCommand": "npm run dev:vite",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build:renderer",
+    "frontendDist": "../dist-renderer",
+    "removeUnusedCommands": true
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "滚猫md",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 860,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "backgroundColor": "#f5f1ea"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' tauri: asset: data: blob:; img-src 'self' tauri: asset: file: data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "shortDescription": "滚猫md（rollcat-md）",
+    "longDescription": "一个面向 Windows 的轻量 Markdown 阅读与编辑器，支持大文件流畅源码模式。"
+  }
+}

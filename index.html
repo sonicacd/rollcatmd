@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="eye">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' tauri: asset: data: blob:; img-src 'self' tauri: asset: file: data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>滚猫md</title>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <img class="brand-icon" src="/src/assets/cat-md-icon.png" alt="" aria-hidden="true">
+        </div>
+      </div>
+
+      <nav class="toolbar" aria-label="文件操作">
+        <button class="tool-button" id="newButton" type="button" aria-keyshortcuts="Control+N Meta+N">新建</button>
+        <button class="tool-button" id="openButton" type="button" aria-keyshortcuts="Control+O Meta+O">打开</button>
+        <button class="tool-button primary" id="saveButton" type="button" aria-keyshortcuts="Control+S Meta+S">保存</button>
+        <button class="tool-button" id="saveAsButton" type="button" aria-keyshortcuts="Control+Shift+S Meta+Shift+S">另存为</button>
+      </nav>
+
+      <div class="mode-switch" role="group" aria-label="编辑模式">
+        <span class="meta-label">视图</span>
+        <button class="mode-button active" id="wysiwygMode" type="button" aria-pressed="true" aria-keyshortcuts="Control+1 Meta+1">所见即所得</button>
+        <button class="mode-button" id="markdownMode" type="button" aria-pressed="false" aria-keyshortcuts="Control+2 Meta+2">源码</button>
+        <button class="mode-button" id="readerMode" type="button" aria-pressed="false" aria-keyshortcuts="Control+3 Meta+3">阅读</button>
+      </div>
+
+      <label class="theme-control" for="themeSelect">
+        <span class="meta-label">主题</span>
+        <select id="themeSelect" aria-label="界面主题">
+          <option value="black">纯黑</option>
+          <option value="white">纯白</option>
+          <option value="eye">护眼</option>
+        </select>
+      </label>
+
+      <footer class="statusbar" aria-label="文档状态">
+        <span id="statusText" role="status" aria-live="polite" aria-atomic="true">已就绪</span>
+        <span
+          id="countText"
+          aria-live="off"
+          title="通用 LLM token 估算值；不同模型的实际分词结果可能不同"
+        >0 字符 / 约 0 tokens</span>
+      </footer>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div>
+          <div class="document-kicker">Live Preview</div>
+          <h1 class="document-title">Markdown 工作台</h1>
+        </div>
+        <div class="window-note">Tauri + 系统 WebView</div>
+      </header>
+
+      <div class="workspace">
+        <section class="editor-panel" id="editorPanel" aria-label="Markdown 编辑器">
+          <div id="editor" aria-hidden="false"></div>
+          <div class="large-file-panel hidden" id="largeFilePanel" aria-hidden="true">
+            <div class="large-file-notice" role="status" aria-live="polite" aria-atomic="true">
+              <strong>大文件模式</strong>
+              <span id="largeFileNotice">为保持流畅，已关闭实时 Markdown 渲染。</span>
+            </div>
+            <div
+              id="largeFileEditor"
+              aria-label="大文件 Markdown 源码编辑器"
+            ></div>
+          </div>
+        </section>
+
+        <section class="reader-panel hidden" id="readerPanel" aria-label="Markdown 阅读视图" aria-hidden="true" tabindex="0">
+          <div id="viewer"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="/src/renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+diff --git a/node_modules/@toast-ui/editor/dist/esm/index.js b/node_modules/@toast-ui/editor/dist/esm/index.js
+index 4cf0107..996473b 100644
+--- a/node_modules/@toast-ui/editor/dist/esm/index.js
++++ b/node_modules/@toast-ui/editor/dist/esm/index.js
+@@ -5,6 +5,7 @@
+  * @license MIT
+  */
+ 
++import DOMPurify from 'dompurify';
+ import { Fragment, Schema, Slice, NodeRange, Mark as Mark$1, DOMParser, Node as Node$3 } from 'prosemirror-model';
+ import { DecorationSet, Decoration, EditorView } from 'prosemirror-view';
+ import { ReplaceAroundStep, liftTarget, canSplit, StepMap } from 'prosemirror-transform';
+@@ -15105,7 +15106,9 @@ function createDOMPurify() {
+   return DOMPurify;
+ }
+ 
+-var purify = createDOMPurify();
++// Use the application's patched DOMPurify dependency instead of the vulnerable
++// 2.3.3 implementation embedded in this prebuilt Toast UI bundle.
++var purify = DOMPurify;
+ 
+ var CAN_BE_WHITE_TAG_LIST = ['iframe', 'embed'];
+ var whiteTagList = [];
+diff --git a/node_modules/@toast-ui/editor/dist/esm/indexViewer.js b/node_modules/@toast-ui/editor/dist/esm/indexViewer.js
+index 04474b5..cb5f7ac 100644
+--- a/node_modules/@toast-ui/editor/dist/esm/indexViewer.js
++++ b/node_modules/@toast-ui/editor/dist/esm/indexViewer.js
+@@ -5,6 +5,7 @@
+  * @license MIT
+  */
+ 
++import DOMPurify from 'dompurify';
+ import { Plugin, PluginKey, Selection, TextSelection } from 'prosemirror-state';
+ import { InputRule, inputRules, undoInputRule } from 'prosemirror-inputrules';
+ import { Decoration, DecorationSet } from 'prosemirror-view';
+@@ -11529,7 +11530,9 @@ function createDOMPurify() {
+   return DOMPurify;
+ }
+ 
+-var purify = createDOMPurify();
++// Use the application's patched DOMPurify dependency instead of the vulnerable
++// 2.3.3 implementation embedded in this prebuilt Toast UI bundle.
++var purify = DOMPurify;
+ 
+ var CAN_BE_WHITE_TAG_LIST = ['iframe', 'embed'];
+ var whiteTagList = [];

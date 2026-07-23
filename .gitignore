@@ -1,0 +1,30 @@
+# Dependencies and generated builds
+/node_modules/
+/dist-renderer/
+/src-tauri/target/
+/release/
+
+# Local development state
+/.agents/
+/.codex/
+/.vscode/
+/.idea/
+
+# Environment files and logs
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+
+# Windows-only project: ignore unused generated mobile/macOS icons
+/src-tauri/icons/android/
+/src-tauri/icons/ios/
+/src-tauri/icons/icon.icns
+/src-tauri/icons/64x64.png
+/src-tauri/icons/Square*.png
+/src-tauri/icons/StoreLogo.png
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
