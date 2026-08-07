@@ -7,9 +7,12 @@ import {
   estimateLlmTokens,
   estimateLlmTokensFromByteLength,
   estimateLlmTokensInChunks,
-  formatFileSize,
   shouldUseLargeDocumentMode
 } from '../src/document-size.js';
+
+test('uses 2.5 MiB as the viewport-rendering threshold', () => {
+  assert.equal(LARGE_DOCUMENT_THRESHOLD_BYTES, 2_621_440);
+});
 
 test('uses the regular editor below the large-document threshold', () => {
   assert.equal(
@@ -26,13 +29,6 @@ test('uses lightweight mode at and above the threshold', () => {
 test('falls back to character count when byte size is unavailable', () => {
   assert.equal(shouldUseLargeDocumentMode(undefined, LARGE_DOCUMENT_THRESHOLD_BYTES), true);
   assert.equal(shouldUseLargeDocumentMode(undefined, 100), false);
-});
-
-test('formats file sizes for the large-file notice', () => {
-  assert.equal(formatFileSize(512), '512 B');
-  assert.equal(formatFileSize(1536), '1.5 KB');
-  assert.equal(formatFileSize(15 * 1024 * 1024), '15.0 MB');
-  assert.equal(formatFileSize(undefined), '');
 });
 
 test('estimates LLM tokens from UTF-8 bytes without a tokenizer dependency', () => {

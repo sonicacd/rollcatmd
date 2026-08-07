@@ -4,7 +4,9 @@ import '@toast-ui/editor/dist/i18n/zh-cn';
 import '@toast-ui/editor/dist/toastui-editor.css';
 import '@toast-ui/editor/dist/toastui-editor-viewer.css';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { EditorState } from '@codemirror/state';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { Compartment, EditorState } from '@codemirror/state';
 import { search, searchKeymap } from '@codemirror/search';
 import {
   drawSelection,
@@ -13,6 +15,7 @@ import {
   keymap,
   lineNumbers
 } from '@codemirror/view';
+import { tags } from '@lezer/highlight';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
@@ -20,17 +23,14 @@ import { readFile } from '@tauri-apps/plugin-fs';
 import {
   LARGE_DOCUMENT_THRESHOLD_BYTES,
   estimateLlmTokensFromByteLength,
-  estimateLlmTokensInChunks,
-  formatFileSize,
   shouldUseLargeDocumentMode
 } from './document-size.js';
 import {
   decodeUtf8Document,
-  markdownPositionToOffset,
   normalizeEditorText,
-  projectedUtf8ByteLength,
   serializeTextDocument,
-  utf8ByteLength
+  utf8ByteLength,
+  utf8ByteLengthInChunks
 } from './text-format.js';
 import {
   classifySaveResult,
@@ -42,13 +42,14 @@ import {
 } from './operation-queue.js';
 import { applyTheme, readStoredTheme } from './theme.js';
 import { formatWindowTitle } from './window-title.js';
+import { largeDocumentPreview } from './large-document-preview.js';
 import './styles.css';
 
 const initialTheme = applyTheme(readStoredTheme(), { persist: false });
 
 const initialMarkdown = `# 欢迎使用滚猫md
 
-滚猫md（rollcat-md）是一款轻量的 Windows 桌面 Markdown 阅读和编辑器，支持所见即所得、源码编辑、专注阅读和大文件流畅处理。
+滚猫md（rollcat-md）是一款轻量的 Windows 桌面 Markdown 阅读和编辑器，支持所见即所得、源码编辑、专注阅读和大型文档流畅处理。
 
 ## 常用格式
 
@@ -97,7 +98,6 @@ const editorPanel = document.querySelector('#editorPanel');
 const readerPanel = document.querySelector('#readerPanel');
 const largeFilePanel = document.querySelector('#largeFilePanel');
 const largeFileEditorElement = document.querySelector('#largeFileEditor');
-const largeFileNotice = document.querySelector('#largeFileNotice');
 const statusText = document.querySelector('#statusText');
 const countText = document.querySelector('#countText');
 const themeSelect = document.querySelector('#themeSelect');
@@ -202,6 +202,53 @@ function sanitizeMarkdownHTML(content) {
   });
 }
 
+const largeDocumentMode = new Compartment();
+
+const largeDocumentHighlightStyle = HighlightStyle.define([
+  {
+    tag: [
+      tags.heading1,
+      tags.heading2,
+      tags.heading3,
+      tags.heading4,
+      tags.heading5,
+      tags.heading6
+    ],
+    color: 'var(--heading-accent)',
+    fontWeight: '750'
+  },
+  { tag: tags.strong, color: 'var(--text-strong)', fontWeight: '750' },
+  { tag: tags.emphasis, color: 'var(--emphasis)', fontStyle: 'italic' },
+  { tag: tags.strikethrough, textDecoration: 'line-through' },
+  {
+    tag: [tags.link, tags.url],
+    color: 'var(--link)',
+    textDecoration: 'underline'
+  },
+  {
+    tag: tags.monospace,
+    color: 'var(--inline-code-text)',
+    fontFamily: '"Cascadia Code", "Consolas", monospace'
+  },
+  { tag: tags.quote, color: 'var(--quote-text)' },
+  { tag: [tags.meta, tags.contentSeparator], color: 'var(--muted-soft)' }
+]);
+
+function getLargeDocumentModeExtensions(mode) {
+  const isSource = mode === 'markdown';
+  const isReader = mode === 'reader';
+  const editorClass = isSource
+    ? 'cm-large-source'
+    : `cm-large-preview${isReader ? ' cm-large-reader' : ''}`;
+
+  return [
+    EditorState.readOnly.of(isReader),
+    EditorView.editable.of(!isReader),
+    EditorView.editorAttributes.of({ class: editorClass }),
+    isSource ? [] : largeDocumentPreview
+  ];
+}
+
 const largeFileEditorExtensions = [
   lineNumbers(),
   highlightSpecialChars(),
@@ -209,9 +256,18 @@ const largeFileEditorExtensions = [
   drawSelection(),
   search({ top: true }),
   keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+  markdown({
+    base: markdownLanguage,
+    addKeymap: false,
+    completeHTMLTags: false,
+    pasteURLAsLink: false
+  }),
+  syntaxHighlighting(largeDocumentHighlightStyle),
   EditorState.tabSize.of(2),
+  EditorView.lineWrapping,
+  largeDocumentMode.of(getLargeDocumentModeExtensions('wysiwyg')),
   EditorView.contentAttributes.of({
-    'aria-label': '大文件 Markdown 源码编辑器',
+    'aria-label': 'Markdown 编辑器',
     'aria-multiline': 'true',
     autocapitalize: 'off',
     autocorrect: 'off',
@@ -240,6 +296,65 @@ const largeFileEditorExtensions = [
     '.cm-line': {
       padding: '0 18px'
     },
+    '&.cm-large-preview .cm-scroller': {
+      fontFamily: '"Segoe UI", "Microsoft YaHei", Arial, sans-serif',
+      fontSize: '16px',
+      lineHeight: '1.72'
+    },
+    '&.cm-large-preview .cm-gutters': {
+      display: 'none'
+    },
+    '&.cm-large-preview .cm-line': {
+      paddingLeft: '28px',
+      paddingRight: '28px'
+    },
+    '&.cm-large-preview .cm-md-heading': {
+      color: 'var(--heading-accent)',
+      fontWeight: '750',
+      lineHeight: '1.35',
+      paddingTop: '0.34em',
+      paddingBottom: '0.12em'
+    },
+    '&.cm-large-preview .cm-md-heading-1': {
+      fontSize: '1.72em'
+    },
+    '&.cm-large-preview .cm-md-heading-2': {
+      color: 'var(--heading-accent-alt)',
+      fontSize: '1.46em'
+    },
+    '&.cm-large-preview .cm-md-heading-3': {
+      fontSize: '1.27em'
+    },
+    '&.cm-large-preview .cm-md-heading-4': {
+      fontSize: '1.12em'
+    },
+    '&.cm-large-preview .cm-md-blockquote': {
+      borderLeft: '3px solid var(--teal)',
+      backgroundColor: 'var(--quote-bg)',
+      color: 'var(--quote-text)'
+    },
+    '&.cm-large-preview .cm-md-codeblock': {
+      backgroundColor: 'var(--code-bg)',
+      color: 'var(--code-text)',
+      fontFamily: '"Cascadia Code", "Consolas", monospace',
+      fontSize: '0.9em'
+    },
+    '&.cm-large-preview .cm-md-table': {
+      backgroundColor: 'var(--table-stripe)',
+      fontFamily: '"Cascadia Code", "Consolas", "Microsoft YaHei", monospace',
+      fontSize: '0.92em'
+    },
+    '&.cm-large-preview .cm-md-table-header': {
+      backgroundColor: 'var(--table-head-bg)',
+      color: 'var(--text-strong)',
+      fontWeight: '700'
+    },
+    '&.cm-large-preview .cm-md-horizontal-rule': {
+      color: 'var(--muted-soft)'
+    },
+    '&.cm-large-reader .cm-cursor, &.cm-large-reader .cm-dropCursor': {
+      display: 'none'
+    },
     '.cm-gutters': {
       borderRight: '1px solid var(--line)',
       backgroundColor: 'var(--sidebar)',
@@ -267,7 +382,7 @@ const largeFileEditorExtensions = [
       return;
     }
 
-    noteDocumentChanged();
+    noteDocumentChanged(updateLargeDocumentByteSize(update));
   })
 ];
 
@@ -634,9 +749,38 @@ function beginSuppressChanges() {
   };
 }
 
-function noteDocumentChanged() {
+function documentTextChunks(documentText, from = 0, to = documentText.length) {
+  return {
+    *[Symbol.iterator]() {
+      const iterator = documentText.iterRange(from, to);
+
+      while (!iterator.next().done) {
+        yield iterator.value;
+      }
+    }
+  };
+}
+
+function updateLargeDocumentByteSize(update) {
+  if (!Number.isFinite(state.documentByteSize)) {
+    return null;
+  }
+
+  let byteDelta = 0;
+
+  update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    byteDelta -= utf8ByteLengthInChunks(
+      documentTextChunks(update.startState.doc, fromA, toA)
+    );
+    byteDelta += utf8ByteLengthInChunks(documentTextChunks(inserted));
+  });
+
+  return Math.max(0, state.documentByteSize + byteDelta);
+}
+
+function noteDocumentChanged(documentByteSize = null) {
   state.revision += 1;
-  state.documentByteSize = null;
+  state.documentByteSize = documentByteSize;
   setDirty(state.revision !== state.savedRevision);
   scheduleCountsUpdate();
 }
@@ -651,21 +795,11 @@ function updateSavingState() {
 function updateCounts() {
   if (state.isLargeDocument) {
     const documentText = largeFileEditor.state.doc;
-    let tokenEstimate;
-
-    if (Number.isFinite(state.documentByteSize)) {
-      tokenEstimate = estimateLlmTokensFromByteLength(state.documentByteSize);
-    } else {
-      const iterator = documentText.iter();
-      const chunks = {
-        *[Symbol.iterator]() {
-          while (!iterator.next().done) {
-            yield iterator.value;
-          }
-        }
-      };
-      tokenEstimate = estimateLlmTokensInChunks(chunks);
-    }
+    const byteSize = Number.isFinite(state.documentByteSize)
+      ? state.documentByteSize
+      : utf8ByteLengthInChunks(documentTextChunks(documentText));
+    state.documentByteSize = byteSize;
+    const tokenEstimate = estimateLlmTokensFromByteLength(byteSize);
 
     countText.textContent =
       `${documentText.length.toLocaleString()} 字符 / 约 ${tokenEstimate.toLocaleString()} tokens`;
@@ -673,24 +807,8 @@ function updateCounts() {
   }
 
   const text = editor.getMarkdown();
-
-  // A huge paste/drop is intercepted before Toast UI sees it. This delayed
-  // guard also catches programmatic edits and ordinary typing that grows past
-  // the threshold one small transaction at a time.
-  let byteSize = null;
-
-  if (text.length * 3 >= LARGE_DOCUMENT_THRESHOLD_BYTES) {
-    byteSize = utf8ByteLength(text);
-
-    if (byteSize >= LARGE_DOCUMENT_THRESHOLD_BYTES) {
-      activateLargeDocument(text, byteSize);
-      setStatus('内容已达到大文件阈值，已切换到流畅源码模式');
-      return;
-    }
-  }
-
   const tokenEstimate = estimateLlmTokensFromByteLength(
-    byteSize ?? utf8ByteLength(text)
+    utf8ByteLength(text)
   );
   countText.textContent =
     `${text.length.toLocaleString()} 字符 / 约 ${tokenEstimate.toLocaleString()} tokens`;
@@ -743,21 +861,12 @@ function updateModeButtons() {
     button.setAttribute('aria-pressed', String(isActive));
   });
 
-  controls.wysiwygMode.disabled = state.isLargeDocument;
-  controls.readerMode.disabled = state.isLargeDocument;
-  const disabledReason = state.isLargeDocument
-    ? '大文件模式下已关闭实时 Markdown 渲染'
-    : '';
-  controls.wysiwygMode.title = disabledReason;
-  controls.readerMode.title = disabledReason;
-
-  [controls.wysiwygMode, controls.readerMode].forEach((button) => {
-    if (state.isLargeDocument) {
-      button.setAttribute('aria-describedby', 'largeFileNotice');
-    } else {
-      button.removeAttribute('aria-describedby');
-    }
-  });
+  controls.wysiwygMode.disabled = false;
+  controls.readerMode.disabled = false;
+  controls.wysiwygMode.title = '';
+  controls.readerMode.title = '';
+  controls.wysiwygMode.removeAttribute('aria-describedby');
+  controls.readerMode.removeAttribute('aria-describedby');
 }
 
 function getCalloutTitle(type, rawTitle) {
@@ -837,14 +946,13 @@ function activateLargeDocument(content, byteSize = null) {
   const releaseSuppression = beginSuppressChanges();
   state.isLargeDocument = true;
   state.documentByteSize = byteSize;
-  state.mode = 'markdown';
+  state.mode = 'wysiwyg';
   state.lastSavedContent = null;
   state.lastSavedSerializedContent = null;
 
   // Clear the rich editor before assigning the large text so Toast UI never
   // parses or retains the large document.
   editor.setMarkdown('', false);
-  editor.changeMode('markdown', true);
   editorElement.classList.add('hidden');
   editorElement.setAttribute('aria-hidden', 'true');
   largeFilePanel.classList.remove('hidden');
@@ -852,8 +960,6 @@ function activateLargeDocument(content, byteSize = null) {
   largeFileEditor.setState(createLargeFileEditorState(content));
   showEditorPanel();
 
-  const size = formatFileSize(byteSize);
-  largeFileNotice.textContent = `${size ? `${size}，` : ''}为保持流畅，已关闭所见即所得和阅读渲染。`;
   updateModeButtons();
   updateCounts();
   releaseSuppression();
@@ -928,104 +1034,8 @@ function openDocument({
     originalSerializedContent
   });
 
-  if (isLargeDocument) {
-    setStatus(`已打开 ${getDisplayName(filePath)}（大文件模式）`);
-  } else {
-    setStatus(`已打开 ${getDisplayName(filePath)}`);
-  }
+  setStatus(`已打开 ${getDisplayName(filePath)}`);
 }
-
-function getRegularEditorSelectionOffsets(markdown) {
-  try {
-    let [start, end] = editor.getSelection();
-
-    if (typeof start === 'number' && typeof end === 'number') {
-      [start, end] = editor.convertPosToMatchEditorMode(start, end, 'markdown');
-    }
-
-    const startOffset = markdownPositionToOffset(markdown, start);
-    const endOffset = markdownPositionToOffset(markdown, end);
-    return [Math.min(startOffset, endOffset), Math.max(startOffset, endOffset)];
-  } catch {
-    return [markdown.length, markdown.length];
-  }
-}
-
-function planLargeInsertion(insertedText) {
-  if (state.isLargeDocument || !insertedText) {
-    return null;
-  }
-
-  const current = editor.getMarkdown();
-  const [start, end] = getRegularEditorSelectionOffsets(current);
-  const normalizedInsertion = normalizeEditorText(insertedText);
-  const nextByteSize = projectedUtf8ByteLength(
-    current,
-    start,
-    end,
-    normalizedInsertion
-  );
-
-  if (nextByteSize < LARGE_DOCUMENT_THRESHOLD_BYTES) {
-    return null;
-  }
-
-  return {
-    content: current.slice(0, start) + normalizedInsertion + current.slice(end),
-    cursorOffset: start + normalizedInsertion.length,
-    byteSize: nextByteSize
-  };
-}
-
-function applyLargeInsertion(plan) {
-  activateLargeDocument(plan.content, plan.byteSize);
-  largeFileEditor.dispatch({
-    selection: { anchor: plan.cursorOffset },
-    scrollIntoView: true
-  });
-  noteDocumentChanged();
-  setStatus('插入内容较大，已在解析前切换到流畅源码模式');
-  largeFileEditor.focus();
-}
-
-function interceptLargeInsertion(event, text) {
-  const plan = planLargeInsertion(text);
-
-  if (!plan) {
-    return;
-  }
-
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  applyLargeInsertion(plan);
-}
-
-editorElement.addEventListener('paste', (event) => {
-  interceptLargeInsertion(event, event.clipboardData?.getData('text/plain') || '');
-}, true);
-
-editorElement.addEventListener('drop', (event) => {
-  if (event.dataTransfer?.files?.length) {
-    return;
-  }
-
-  interceptLargeInsertion(event, event.dataTransfer?.getData('text/plain') || '');
-}, true);
-
-const largeInsertionInputTypes = new Set([
-  'insertText',
-  'insertFromPaste',
-  'insertFromDrop',
-  'insertReplacementText'
-]);
-
-editorElement.addEventListener('beforeinput', (event) => {
-  // Paste and drop have richer events above. This catches other browser or
-  // assistive-technology insertions that deliver a large text payload.
-  if (largeInsertionInputTypes.has(event.inputType) && (event.data?.length || 0) >= 64 * 1024) {
-    interceptLargeInsertion(event, event.data);
-  }
-}, true);
 
 function confirmDiscardChanges() {
   if (!state.isDirty) {
@@ -1174,15 +1184,13 @@ function saveFile(saveAs = false) {
 }
 
 function setMode(mode) {
-  if (state.isLargeDocument && mode !== 'markdown') {
-    setStatus('大文件模式仅支持源码编辑；实时渲染已关闭');
-    return;
-  }
-
   state.mode = mode;
 
   if (state.isLargeDocument) {
     showEditorPanel();
+    largeFileEditor.dispatch({
+      effects: largeDocumentMode.reconfigure(getLargeDocumentModeExtensions(mode))
+    });
     largeFileEditor.focus();
     updateModeButtons();
     return;

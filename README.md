@@ -4,9 +4,9 @@
 
 # 滚猫md / rollcat-md
 
-一款轻量的 Windows Markdown 阅读与编辑软件，支持所见即所得、源码编辑、专注阅读，以及面向大文件的流畅源码模式。
+一款轻量的 Windows Markdown 阅读与编辑软件，支持所见即所得、源码编辑、专注阅读，以及面向大文件的可视区分块渲染。
 
-A lightweight Markdown reader and editor for Windows, with WYSIWYG editing, source editing, focused reading, and a smooth source mode for large files.
+A lightweight Windows Markdown reader and editor with WYSIWYG editing, source editing, focused reading, and viewport rendering for large files.
 
 [中文说明](#中文说明) · [English Guide](#english-guide)
 
@@ -71,19 +71,21 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 
 主题会同步调整界面、编辑区、阅读区和代码区的背景及文字颜色。选择会自动记住，下次启动时继续使用。
 
-### 大文件模式
+### 大文件分块渲染
 
-当文档达到 **1 MiB（1,048,576 字节）** 时，滚猫md会自动切换到轻量的源码编辑器，避免实时渲染大型 Markdown 导致界面卡死。
+打开达到 **2.5 MiB（2,621,440 字节）** 的文档时，滚猫md会直接进入可视区分块渲染，不会先把全文交给完整排版引擎。界面只挂载屏幕附近的内容，从而降低打开、滚动和编辑大文件时的卡顿风险。
 
-大文件模式仍然支持：
+分块渲染仍然支持：
 
 - 编辑、选择、复制和粘贴
+- 所见即所得（轻量 Live Preview）、源码和阅读（只读轻量预览）三种视图
+- Markdown 标题、强调、链接、引用、表格及代码块的可读样式
 - 查找
 - 撤销和重做
 - 保存与另存为
 - 字符数和 LLM token 估算
 
-为保持流畅，大文件模式会关闭所见即所得和阅读渲染。直接打开大文件、粘贴或拖入大量文字，以及文档编辑后增长到阈值时，都会自动触发这一模式。
+为了不打断正在编辑的内容，普通文档在编辑或粘贴后增长到 2.5 MiB 时不会突然更换编辑器；保存并重新打开后才会使用分块渲染。大文件视图采用轻量 Live Preview，复杂组件的外观可能与普通文档的完整所见即所得略有不同。
 
 ### 支持的文件
 
@@ -110,7 +112,7 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 | 所见即所得 | `Ctrl+1` |
 | 源码 | `Ctrl+2` |
 | 阅读 | `Ctrl+3` |
-| 查找（源码及大文件模式） | `Ctrl+F` |
+| 查找（源码及分块渲染视图） | `Ctrl+F` |
 
 ### 保存与数据安全
 
@@ -139,9 +141,9 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 
 安装或修复 Microsoft Edge WebView2 Runtime，然后重新启动滚猫md。
 
-**为什么大文件只能使用源码视图？**
+**为什么大文件的排版与普通文档略有不同？**
 
-实时排版和阅读渲染会消耗较多内存和处理时间。滚猫md会在文档达到 1 MiB 后关闭这些渲染，以保证文件仍可流畅打开、编辑和保存。
+达到 2.5 MiB 的文件会使用轻量 Live Preview，只为当前可视区域创建排版元素。标题、强调、链接、引用和代码块仍然清晰可读，同时避免打开文件时生成整篇页面而卡死。
 
 **为什么文件无法打开？**
 
@@ -220,19 +222,21 @@ Three complete color themes are available:
 
 The theme updates the application, editor, reader, and code colors together. Your choice is remembered for the next launch.
 
-### Large Files
+### Viewport Rendering for Large Files
 
-Documents at or above **1 MiB (1,048,576 bytes)** automatically use a lightweight source editor. This prevents real-time Markdown rendering from freezing the interface.
+When opening a document at or above **2.5 MiB (2,621,440 bytes)**, rollcat-md goes directly into viewport rendering instead of first passing the whole file to the full layout engine. Only content near the screen is mounted, reducing the risk of stalls while opening, scrolling, and editing large files.
 
-Large-file mode still supports:
+Viewport rendering still supports:
 
 - Editing, selection, copy, and paste
+- WYSIWYG (lightweight Live Preview), Source, and Reader (read-only lightweight preview) views
+- Readable Markdown styling for headings, emphasis, links, quotes, tables, and code blocks
 - Search
 - Undo and redo
 - Save and Save As
 - Character count and estimated LLM tokens
 
-WYSIWYG and Reader rendering are disabled to keep the application responsive. Large-file mode can be triggered when opening a file, pasting or dropping a large amount of text, or when a document grows past the threshold.
+To avoid interrupting active work, a regular document that grows past 2.5 MiB while being edited or pasted into does not suddenly replace its editor. Viewport rendering is selected the next time that saved document is opened. Large files use a lightweight Live Preview, so complex components may look slightly different from the full WYSIWYG editor used for regular documents.
 
 ### Supported Files
 
@@ -259,7 +263,7 @@ Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-1
 | WYSIWYG view | `Ctrl+1` |
 | Source view | `Ctrl+2` |
 | Reader view | `Ctrl+3` |
-| Find in Source or large-file mode | `Ctrl+F` |
+| Find in Source or viewport-rendered view | `Ctrl+F` |
 
 ### Saving and Data Safety
 
@@ -288,9 +292,9 @@ Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-1
 
 Install or repair Microsoft Edge WebView2 Runtime, then launch 滚猫md again.
 
-**Why are WYSIWYG and Reader unavailable for a large file?**
+**Why does a large file look slightly different from a regular document?**
 
-Real-time formatting and rendering can use substantial memory and processing time. At 1 MiB or above, rollcat-md disables them so the file remains responsive and editable.
+Files at or above 2.5 MiB use a lightweight Live Preview that only creates layout elements for the visible area. Headings, emphasis, links, quotes, and code blocks remain readable without constructing a full page for the entire document during opening.
 
 **Why will a file not open?**
 

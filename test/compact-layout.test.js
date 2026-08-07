@@ -12,6 +12,11 @@ test('the compact toolbar omits duplicate app and file-name blocks', () => {
   assert.doesNotMatch(pageHtml, /id="fileName"/);
 });
 
+test('viewport rendering stays an internal detail without an editor banner', () => {
+  assert.doesNotMatch(pageHtml, /large-file-notice|largeFileNotice/);
+  assert.doesNotMatch(pageHtml, /分块渲染|仅渲染可视区域/);
+});
+
 test('visual status only shows document counts while announcements remain accessible', () => {
   const updateCountsSource = rendererSource.match(
     /function updateCounts\(\)\s*\{[\s\S]*?\n\}\n\nlet countUpdateTimer/

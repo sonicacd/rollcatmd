@@ -39,6 +39,6 @@
     ],
     "category": "Productivity",
     "shortDescription": "滚猫md（rollcat-md）",
-    "longDescription": "一个面向 Windows 的轻量 Markdown 阅读与编辑器，支持大文件流畅源码模式。"
+    "longDescription": "一个面向 Windows 的轻量 Markdown 阅读与编辑器，支持大型 Markdown 文档流畅处理。"
   }
 }
