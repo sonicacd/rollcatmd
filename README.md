@@ -41,6 +41,8 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 - **源码**：直接编辑 Markdown 原文，适合精确控制格式。
 - **阅读**：只显示渲染后的内容，适合专注阅读。
 
+所见即所得、阅读及大文档轻量预览使用一致的 Obsidian 风格正文节奏：16px 正文、1.5 倍行高和清晰段距。排版内容宽度会随窗口自适应，宽屏下最大为 1200px。
+
 ### 支持的 Markdown 格式
 
 工具栏支持：
@@ -191,6 +193,8 @@ Tokens are displayed as “approximately N tokens.” This is a fast, model-inde
 - **WYSIWYG**: edit while seeing the formatted result.
 - **Source**: edit the Markdown text directly.
 - **Reader**: display only the rendered document.
+
+WYSIWYG, Reader, and large-document lightweight preview share an Obsidian-inspired reading rhythm: 16px body text, 1.5 line height, and clear paragraph spacing. Rendered content adapts to the window and is capped at 1200px on wide screens.
 
 ### Markdown Support
 

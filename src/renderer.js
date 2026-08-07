@@ -214,11 +214,11 @@ const largeDocumentHighlightStyle = HighlightStyle.define([
       tags.heading5,
       tags.heading6
     ],
-    color: 'var(--heading-accent)',
-    fontWeight: '750'
+    color: 'var(--text)',
+    fontWeight: 'inherit'
   },
-  { tag: tags.strong, color: 'var(--text-strong)', fontWeight: '750' },
-  { tag: tags.emphasis, color: 'var(--emphasis)', fontStyle: 'italic' },
+  { tag: tags.strong, color: 'inherit', fontWeight: '600' },
+  { tag: tags.emphasis, color: 'inherit', fontStyle: 'italic' },
   { tag: tags.strikethrough, textDecoration: 'line-through' },
   {
     tag: [tags.link, tags.url],
@@ -230,7 +230,7 @@ const largeDocumentHighlightStyle = HighlightStyle.define([
     color: 'var(--inline-code-text)',
     fontFamily: '"Cascadia Code", "Consolas", monospace'
   },
-  { tag: tags.quote, color: 'var(--quote-text)' },
+  { tag: tags.quote, color: 'inherit' },
   { tag: [tags.meta, tags.contentSeparator], color: 'var(--muted-soft)' }
 ]);
 
@@ -286,7 +286,7 @@ const largeFileEditorExtensions = [
       overflow: 'auto',
       fontFamily: '"Cascadia Code", "Consolas", "Microsoft YaHei", monospace',
       fontSize: '14px',
-      lineHeight: '1.65'
+      lineHeight: '1.5'
     },
     '.cm-content': {
       minHeight: '100%',
@@ -297,41 +297,70 @@ const largeFileEditorExtensions = [
       padding: '0 18px'
     },
     '&.cm-large-preview .cm-scroller': {
-      fontFamily: '"Segoe UI", "Microsoft YaHei", Arial, sans-serif',
+      fontFamily: 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Microsoft YaHei", sans-serif',
       fontSize: '16px',
-      lineHeight: '1.72'
+      lineHeight: '1.5'
     },
     '&.cm-large-preview .cm-gutters': {
       display: 'none'
     },
+    '&.cm-large-preview .cm-sizer': {
+      maxWidth: 'var(--document-layout-max-width)',
+      marginLeft: 'auto',
+      marginRight: 'auto'
+    },
+    '&.cm-large-preview .cm-content': {
+      maxWidth: 'var(--document-layout-max-width)'
+    },
     '&.cm-large-preview .cm-line': {
-      paddingLeft: '28px',
-      paddingRight: '28px'
+      maxWidth: 'var(--document-layout-max-width)',
+      paddingLeft: '36px',
+      paddingRight: '36px'
     },
     '&.cm-large-preview .cm-md-heading': {
-      color: 'var(--heading-accent)',
-      fontWeight: '750',
-      lineHeight: '1.35',
-      paddingTop: '0.34em',
-      paddingBottom: '0.12em'
+      color: 'var(--text)',
+      paddingTop: '1rem',
+      paddingBottom: '0'
     },
     '&.cm-large-preview .cm-md-heading-1': {
-      fontSize: '1.72em'
+      fontSize: '1.618em',
+      fontWeight: '700',
+      lineHeight: '1.2',
+      letterSpacing: '-0.015em'
     },
     '&.cm-large-preview .cm-md-heading-2': {
-      color: 'var(--heading-accent-alt)',
-      fontSize: '1.46em'
+      fontSize: '1.462em',
+      fontWeight: '680',
+      lineHeight: '1.2',
+      letterSpacing: '-0.011em'
     },
     '&.cm-large-preview .cm-md-heading-3': {
-      fontSize: '1.27em'
+      fontSize: '1.318em',
+      fontWeight: '660',
+      lineHeight: '1.3',
+      letterSpacing: '-0.008em'
     },
     '&.cm-large-preview .cm-md-heading-4': {
-      fontSize: '1.12em'
+      fontSize: '1.188em',
+      fontWeight: '640',
+      lineHeight: '1.4',
+      letterSpacing: '-0.005em'
+    },
+    '&.cm-large-preview .cm-md-heading-5': {
+      fontSize: '1.076em',
+      fontWeight: '620',
+      lineHeight: '1.5',
+      letterSpacing: '-0.002em'
+    },
+    '&.cm-large-preview .cm-md-heading-6': {
+      fontSize: '1em',
+      fontWeight: '600',
+      lineHeight: '1.5'
     },
     '&.cm-large-preview .cm-md-blockquote': {
-      borderLeft: '3px solid var(--teal)',
-      backgroundColor: 'var(--quote-bg)',
-      color: 'var(--quote-text)'
+      borderLeft: '2px solid var(--accent)',
+      backgroundColor: 'transparent',
+      color: 'inherit'
     },
     '&.cm-large-preview .cm-md-codeblock': {
       backgroundColor: 'var(--code-bg)',
