@@ -1,6 +1,12 @@
 :root,
 :root[data-theme="eye"] {
   color-scheme: light;
+  --document-max-width: 1200px;
+  --document-layout-max-width: calc(var(--document-max-width) + 72px);
+  --document-font-size: 16px;
+  --document-line-height: 1.5;
+  --document-paragraph-spacing: 1rem;
+  --document-heading-spacing: 2.5rem;
   --bg: #e7eddf;
   --bg-soft: #edf2e7;
   --sidebar: #dfe8d8;
@@ -420,29 +426,10 @@ button {
 }
 
 .large-file-panel {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-height: 0;
   background: var(--surface-deep);
-}
-
-.large-file-notice {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  min-height: 38px;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--notice-bg);
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.large-file-notice strong {
-  flex: 0 0 auto;
-  color: var(--amber);
 }
 
 #largeFileEditor {
@@ -645,7 +632,7 @@ button {
   color: var(--text);
   font-family: "Cascadia Code", "Consolas", "Microsoft YaHei", monospace;
   font-size: 14px;
-  line-height: 1.7;
+  line-height: var(--document-line-height);
 }
 
 .toastui-editor-md-container .toastui-editor.md-mode,
@@ -658,7 +645,7 @@ button {
   caret-color: var(--accent-strong);
   font-family: "Cascadia Code", "Consolas", "Microsoft YaHei", monospace;
   font-size: 14px;
-  line-height: 1.7;
+  line-height: var(--document-line-height);
 }
 
 .toastui-editor-md-container .toastui-editor.md-mode .ProseMirror ::selection {
@@ -690,111 +677,148 @@ button {
 }
 
 .toastui-editor-ww-container .ProseMirror,
-.toastui-editor-md-preview .toastui-editor-contents,
-#viewer .toastui-editor-contents {
-  width: min(100%, 1120px);
+.toastui-editor-md-preview .toastui-editor-contents {
+  width: min(100%, var(--document-layout-max-width));
+  max-width: var(--document-layout-max-width);
   margin: 0 auto;
-  padding: 24px 36px 58px;
+  padding: 32px 36px 58px;
 }
 
 #viewer .toastui-editor-contents {
+  width: min(100%, var(--document-max-width));
+  max-width: var(--document-max-width);
+  margin: 0 auto;
   padding: 0;
 }
 
-.toastui-editor-contents {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents {
   color: var(--text);
-  font-size: 16px;
-  line-height: 1.78;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Microsoft YaHei", sans-serif;
+  font-size: var(--document-font-size);
+  line-height: var(--document-line-height);
   letter-spacing: 0;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
-.toastui-editor-contents > *:first-child {
-  margin-top: 0;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents :not(table) {
+  line-height: inherit;
 }
 
-.toastui-editor-contents p {
-  margin: 0.9em 0;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents > :first-child {
+  margin-block-start: 0;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents > :last-child {
+  margin-block-end: 0;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents p {
+  margin-block-start: var(--document-paragraph-spacing);
+  margin-block-end: var(--document-paragraph-spacing);
   color: var(--text);
 }
 
-.toastui-editor-contents h1,
-.toastui-editor-contents h2,
-.toastui-editor-contents h3,
-.toastui-editor-contents h4,
-.toastui-editor-contents h5,
-.toastui-editor-contents h6 {
-  color: var(--text-strong);
-  line-height: 1.25;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents :is(h1, h2, h3, h4, h5, h6) {
+  margin-block-start: var(--document-paragraph-spacing);
+  margin-block-end: var(--document-paragraph-spacing);
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  font-style: normal;
+  font-variant: normal;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents :is(p, pre, table, ul, ol) + :is(h1, h2, h3, h4, h5, h6) {
+  margin-block-start: var(--document-heading-spacing);
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents h1 {
+  font-size: 1.618em;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents h2 {
+  font-size: 1.462em;
+  font-weight: 680;
+  line-height: 1.2;
+  letter-spacing: -0.011em;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents h3 {
+  font-size: 1.318em;
+  font-weight: 660;
+  line-height: 1.3;
+  letter-spacing: -0.008em;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents h4 {
+  font-size: 1.188em;
+  font-weight: 640;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents h5 {
+  font-size: 1.076em;
+  font-weight: 620;
+  line-height: var(--document-line-height);
+  letter-spacing: -0.002em;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents h6 {
+  font-size: 1em;
+  font-weight: 600;
+  line-height: var(--document-line-height);
   letter-spacing: 0;
 }
 
-.toastui-editor-contents h1 {
-  margin: 0 0 0.72em;
-  padding-bottom: 0.34em;
-  border-bottom: 1px solid var(--line-strong);
-  font-size: 2.28rem;
-}
-
-.toastui-editor-contents h2 {
-  margin-top: 1.85em;
-  padding-bottom: 0.32em;
-  border-bottom: 1px solid var(--line);
-  font-size: 1.58rem;
-}
-
-.toastui-editor-contents h3 {
-  margin-top: 1.55em;
-  color: var(--heading-accent);
-  font-size: 1.25rem;
-}
-
-.toastui-editor-contents h4 {
-  margin-top: 1.35em;
-  color: var(--heading-accent-alt);
-  font-size: 1.08rem;
-}
-
-.toastui-editor-contents a {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents a {
   color: var(--link);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.toastui-editor-contents a:hover {
-  text-decoration: underline;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents a:hover {
   text-underline-offset: 3px;
 }
 
-.toastui-editor-contents strong {
-  color: var(--text-strong);
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents strong {
+  color: inherit;
+  font-weight: 600;
 }
 
-.toastui-editor-contents em {
-  color: var(--emphasis);
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents em {
+  color: inherit;
 }
 
-.toastui-editor-contents hr {
-  height: 1px;
-  margin: 2.1em 0;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents hr {
+  height: 0;
+  margin: 2rem 0;
   border: 0;
-  background: var(--line);
+  border-top: 2px solid var(--line);
+  background: transparent;
 }
 
-.toastui-editor-contents blockquote {
-  margin: 1.2em 0;
-  padding: 12px 18px;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 8px 8px 0;
-  background: var(--quote-bg);
-  color: var(--quote-text);
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents blockquote:not(.obsidian-callout) {
+  margin: var(--document-paragraph-spacing) 0;
+  padding: 0 0 0 24px;
+  border: 0;
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-style: normal;
 }
 
-.toastui-editor-contents blockquote > :first-child {
-  margin-top: 0;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents blockquote > :first-child {
+  margin-block-start: 0;
 }
 
-.toastui-editor-contents blockquote > :last-child {
-  margin-bottom: 0;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents blockquote > :last-child {
+  margin-block-end: 0;
 }
 
 .toastui-editor-contents .obsidian-callout {
@@ -863,82 +887,104 @@ button {
   --callout: var(--muted);
 }
 
-.toastui-editor-contents code {
-  border: 1px solid var(--inline-code-border);
-  border-radius: 5px;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents code {
+  border: 0;
+  border-radius: 4px;
   background: var(--inline-code-bg);
   color: var(--inline-code-text);
   font-family: "Cascadia Code", "Consolas", monospace;
-  font-size: 0.92em;
+  font-size: 0.875em;
 }
 
-.toastui-editor-contents pre {
-  margin: 1.35em 0;
-  padding: 16px 18px;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents pre {
+  margin: var(--document-paragraph-spacing) 0;
+  padding: 12px 16px;
   overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 4px;
   background: var(--code-bg);
   box-shadow: none;
 }
 
-.toastui-editor-contents pre code {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents pre code {
   border: 0;
   background: transparent;
   color: var(--code-text);
-  font-size: 0.94rem;
-  line-height: 1.7;
+  font-size: 0.875em;
+  line-height: var(--document-line-height);
 }
 
-.toastui-editor-contents ul,
-.toastui-editor-contents ol {
-  padding-left: 1.45em;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents ul,
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents ol {
+  margin-block-start: var(--document-paragraph-spacing);
+  margin-block-end: var(--document-paragraph-spacing);
+  padding-inline-start: 0;
 }
 
-.toastui-editor-contents li {
-  margin: 0.28em 0;
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents li {
+  margin-inline-start: 3ch;
+  padding-block: 0.075em;
   color: var(--text);
 }
 
-.toastui-editor-contents li::marker {
-  color: var(--accent-strong);
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents ul > li::before {
+  background-color: var(--muted-soft);
 }
 
-.toastui-editor-contents input[type="checkbox"] {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents ol > li::before {
+  color: var(--muted-soft);
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents li > p:first-of-type {
+  margin-block-start: 0;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents li > p:last-of-type {
+  margin-block-end: 0;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents :is(ul, ol) :is(ul, ol) {
+  margin-block-start: 0;
+  margin-block-end: 0;
+}
+
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents input[type="checkbox"] {
   width: 15px;
   height: 15px;
   margin-right: 8px;
   accent-color: var(--accent);
 }
 
-.toastui-editor-contents table {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents table {
   display: block;
   width: 100%;
-  margin: 1.35em 0;
+  margin: var(--document-paragraph-spacing) 0;
   overflow-x: auto;
   border-collapse: collapse;
+  line-height: 1.3;
 }
 
-.toastui-editor-contents th,
-.toastui-editor-contents td {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents th,
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents td {
   padding: 10px 12px;
   border: 1px solid var(--line);
   color: var(--text);
 }
 
-.toastui-editor-contents th {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents th {
   background: var(--table-head-bg);
   color: var(--text-strong);
   font-weight: 700;
 }
 
-.toastui-editor-contents tr:nth-child(even) td {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents tr:nth-child(even) td {
   background: var(--table-stripe);
 }
 
-.toastui-editor-contents img {
+:is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents img {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: 0;
+  outline: none;
 }
 
 @media (max-width: 820px) {
@@ -1160,22 +1206,23 @@ button {
 }
 
 .toastui-editor-ww-container .ProseMirror {
-  width: 100%;
-  max-width: none;
+  width: min(100%, var(--document-layout-max-width));
+  max-width: var(--document-layout-max-width);
   min-height: 100%;
-  margin: 0;
-  padding: 22px 28px 64px;
+  margin: 0 auto;
+  padding: 32px 36px 64px;
 }
 
 .toastui-editor-md-preview .toastui-editor-contents {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 22px 28px 64px;
+  width: min(100%, var(--document-layout-max-width));
+  max-width: var(--document-layout-max-width);
+  margin: 0 auto;
+  padding: 32px 36px 64px;
 }
 
 #viewer .toastui-editor-contents {
-  width: min(100%, 1120px);
+  width: min(100%, var(--document-max-width));
+  max-width: var(--document-max-width);
   margin: 0 auto;
   padding: 0;
 }
