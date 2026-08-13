@@ -71,7 +71,10 @@ test('applyTheme updates the root and optionally persists the choice', () => {
 });
 
 test('the page exposes a keyboard-native selector for all three themes', () => {
-  assert.match(pageHtml, /<label class="theme-control" for="themeSelect">/);
+  assert.match(
+    pageHtml,
+    /<label\s+[^>]*class="theme-control"[^>]*for="themeSelect"[^>]*>/
+  );
   assert.match(pageHtml, /<select id="themeSelect" aria-label="界面主题">/);
 
   for (const theme of AVAILABLE_THEMES) {

@@ -17,9 +17,10 @@ import {
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { readFile } from '@tauri-apps/plugin-fs';
+import { readFile, writeFile } from '@tauri-apps/plugin-fs';
 import {
   LARGE_DOCUMENT_THRESHOLD_BYTES,
   estimateLlmTokensFromByteLength,
@@ -43,13 +44,28 @@ import {
 import { applyTheme, readStoredTheme } from './theme.js';
 import { formatWindowTitle } from './window-title.js';
 import { largeDocumentPreview } from './large-document-preview.js';
+import {
+  canOverwriteOpenedFile,
+  getFileDisplayName,
+  isUriBackedFilePath,
+  writeNativeDocument
+} from './platform-file.js';
+import {
+  createMobileChromeState,
+  isMobileChromeCollapsed,
+  reduceMobileChrome
+} from './mobile-chrome.js';
 import './styles.css';
 
 const initialTheme = applyTheme(readStoredTheme(), { persist: false });
+document.documentElement.classList.toggle(
+  'android-runtime',
+  /Android/i.test(navigator.userAgent) && isTauriRuntime()
+);
 
 const initialMarkdown = `# 欢迎使用滚猫md
 
-滚猫md（rollcat-md）是一款轻量的 Windows 桌面 Markdown 阅读和编辑器，支持所见即所得、源码编辑、专注阅读和大型文档流畅处理。
+滚猫md（rollcat-md）是一款轻量的 Markdown 阅读和编辑器，支持所见即所得、源码编辑、专注阅读和大型文档流畅处理。
 
 ## 常用格式
 
@@ -100,7 +116,14 @@ const largeFilePanel = document.querySelector('#largeFilePanel');
 const largeFileEditorElement = document.querySelector('#largeFileEditor');
 const statusText = document.querySelector('#statusText');
 const countText = document.querySelector('#countText');
+const mobileDocumentName = document.querySelector('#mobileDocumentName');
+const mobileDirtyState = document.querySelector('#mobileDirtyState');
+const mobileChromeToggle = document.querySelector('#mobileChromeToggle');
+const mobileFileToolbar = document.querySelector('#mobileFileToolbar');
+const mobileModeSwitch = document.querySelector('#mobileModeSwitch');
 const themeSelect = document.querySelector('#themeSelect');
+const themeControl = themeSelect.closest('.theme-control');
+const mobileLayoutQuery = window.matchMedia('(max-width: 820px)');
 themeSelect.value = initialTheme;
 
 const markdownFilters = [
@@ -160,6 +183,7 @@ const controls = {
 
 const state = {
   currentFilePath: null,
+  currentFileWritable: false,
   browserFileHandle: null,
   isDirty: false,
   isLargeDocument: false,
@@ -171,6 +195,7 @@ const state = {
   savedRevision: 0,
   openRequestId: 0,
   activeSaveCount: 0,
+  mobileChrome: createMobileChromeState({ mobile: mobileLayoutQuery.matches }),
   lastSavedContent: initialMarkdown,
   lastSavedSerializedContent: initialMarkdown,
   textFormat: {
@@ -454,6 +479,83 @@ let viewer = Editor.factory({
 });
 enhanceRenderedMarkdown(viewerElement);
 
+const editorFormattingToolbar = editorElement.querySelector('.toastui-editor-toolbar');
+editorFormattingToolbar.id = 'mobileFormattingToolbar';
+const mobileChromeRegions = [
+  mobileFileToolbar,
+  mobileModeSwitch,
+  themeControl,
+  editorFormattingToolbar
+];
+let mobileReaderScrollFrame = null;
+let pendingMobileReaderScrollTarget = null;
+let mobileReaderProgrammaticUntil = 0;
+
+function renderMobileChrome() {
+  const collapsed = isMobileChromeCollapsed(state.mobileChrome);
+  const actionLabel = collapsed ? '展开界面控件' : '收起界面控件';
+
+  document.documentElement.classList.toggle('mobile-chrome-collapsed', collapsed);
+  document.documentElement.dataset.mobileChrome = collapsed ? 'compact' : 'expanded';
+  mobileChromeToggle.setAttribute('aria-expanded', String(!collapsed));
+  mobileChromeToggle.title = actionLabel;
+  mobileChromeToggle.querySelector('.mobile-chrome-toggle-label').textContent = actionLabel;
+
+  if (
+    collapsed &&
+    mobileChromeRegions.some((region) => region.contains(document.activeElement))
+  ) {
+    mobileChromeToggle.focus({ preventScroll: true });
+  }
+
+  mobileChromeRegions.forEach((region) => {
+    region.inert = collapsed;
+    if (collapsed) {
+      region.setAttribute('aria-hidden', 'true');
+    } else {
+      region.removeAttribute('aria-hidden');
+    }
+  });
+}
+
+function dispatchMobileChrome(event) {
+  const wasCollapsed = isMobileChromeCollapsed(state.mobileChrome);
+  state.mobileChrome = reduceMobileChrome(state.mobileChrome, event);
+  const isCollapsed = isMobileChromeCollapsed(state.mobileChrome);
+
+  if (wasCollapsed !== isCollapsed || event.type !== 'reader-scroll') {
+    renderMobileChrome();
+  }
+}
+
+function markMobileReaderScrollProgrammatic(duration = 240) {
+  mobileReaderProgrammaticUntil = performance.now() + duration;
+}
+
+function scheduleMobileReaderScroll(event) {
+  pendingMobileReaderScrollTarget = event.currentTarget;
+
+  if (mobileReaderScrollFrame !== null) {
+    return;
+  }
+
+  mobileReaderScrollFrame = window.requestAnimationFrame(() => {
+    mobileReaderScrollFrame = null;
+    const scrollTarget = pendingMobileReaderScrollTarget;
+    pendingMobileReaderScrollTarget = null;
+
+    if (!scrollTarget || !mobileLayoutQuery.matches || state.mode !== 'reader') {
+      return;
+    }
+
+    dispatchMobileChrome({
+      type: 'reader-scroll',
+      scrollTop: scrollTarget.scrollTop,
+      reason: performance.now() < mobileReaderProgrammaticUntil ? 'programmatic' : 'user'
+    });
+  });
+}
+
 function getCurrentMarkdown() {
   if (state.isLargeDocument) {
     return largeFileEditor.state.doc.toString();
@@ -463,11 +565,7 @@ function getCurrentMarkdown() {
 }
 
 function getDisplayName(filePath) {
-  if (!filePath) {
-    return '未命名.md';
-  }
-
-  return filePath.split(/[\\/]/).pop() || filePath;
+  return getFileDisplayName(filePath);
 }
 
 function isTauriRuntime() {
@@ -679,7 +777,8 @@ async function saveMarkdownFile({
   filePath,
   content,
   saveAs,
-  browserFileHandle
+  browserFileHandle,
+  fileWritable
 }) {
   if (!isTauriRuntime()) {
     return saveBrowserFile({
@@ -692,10 +791,12 @@ async function saveMarkdownFile({
 
   let targetPath = filePath;
 
-  if (!targetPath || saveAs) {
+  if (!targetPath || saveAs || !fileWritable) {
     targetPath = await saveDialog({
       title: '保存 Markdown 文件',
-      defaultPath: targetPath || '未命名.md',
+      defaultPath: targetPath && !isUriBackedFilePath(targetPath)
+        ? targetPath
+        : getDisplayName(targetPath),
       filters: markdownFilters
     });
 
@@ -704,8 +805,13 @@ async function saveMarkdownFile({
     }
   }
 
-  await invoke('write_text_file_atomic', { path: targetPath, content });
-  return { canceled: false, filePath: targetPath };
+  await writeNativeDocument({
+    filePath: targetPath,
+    content,
+    writeFile,
+    invoke
+  });
+  return { canceled: false, filePath: targetPath, fileWritable: true };
 }
 
 async function openInitialLaunchFile() {
@@ -744,8 +850,86 @@ async function openInitialLaunchFile() {
   }
 }
 
+let lastExternalOpen = { uri: null, time: 0 };
+
+async function openExternalFileUrls(urls) {
+  const filePath = Array.isArray(urls)
+    ? urls.find((url) => typeof url === 'string' && url.length > 0)
+    : null;
+
+  if (!filePath) {
+    return false;
+  }
+
+  const now = Date.now();
+  if (lastExternalOpen.uri === filePath && now - lastExternalOpen.time < 1500) {
+    return false;
+  }
+  lastExternalOpen = { uri: filePath, time: now };
+
+  if (!confirmDiscardChanges()) {
+    setStatus('已取消打开外部文件');
+    return false;
+  }
+
+  const request = beginOpenRequest();
+
+  try {
+    setStatus('正在读取外部文件…');
+    const bytes = await readFile(filePath);
+
+    if (!canApplyOpenRequest(request)) {
+      return false;
+    }
+
+    openDocument({
+      filePath,
+      ...decodeOpenedDocument(bytes),
+      byteSize: bytes.byteLength,
+      fileWritable: false
+    });
+    return true;
+  } catch (error) {
+    if (!canApplyOpenRequest(request)) {
+      return false;
+    }
+
+    setStatus('打开外部文件失败');
+    window.alert(`打开外部文件失败：${error.message || error}`);
+    return false;
+  }
+}
+
+async function initializeNativeFileOpenHandling() {
+  if (!isTauriRuntime()) {
+    return;
+  }
+
+  try {
+    await listen('opened', (event) => {
+      void openExternalFileUrls(event.payload);
+    });
+
+    const openedUrls = await invoke('take_opened_urls');
+    if (await openExternalFileUrls(openedUrls)) {
+      return;
+    }
+  } catch (error) {
+    console.warn('初始化移动端文件打开处理失败', error);
+  }
+
+  await openInitialLaunchFile();
+}
+
+let statusHideTimer = null;
+
 function setStatus(message) {
   statusText.textContent = message;
+  statusText.classList.add('visible');
+  window.clearTimeout(statusHideTimer);
+  statusHideTimer = window.setTimeout(() => {
+    statusText.classList.remove('visible');
+  }, 2600);
 }
 
 function beginOpenRequest() {
@@ -874,6 +1058,9 @@ function updateTitle() {
   const displayName = getDisplayName(state.currentFilePath);
   const title = formatWindowTitle(displayName, state.isDirty);
   document.title = title;
+  mobileDocumentName.textContent = displayName;
+  mobileDirtyState.textContent = state.isDirty ? ' •' : '';
+  mobileDocumentName.title = state.isDirty ? `${displayName}（未保存）` : displayName;
   syncNativeWindowTitle(title);
 }
 
@@ -1000,6 +1187,7 @@ function setDocument(
   byteSize = null,
   {
     browserFileHandle = null,
+    fileWritable = canOverwriteOpenedFile(filePath),
     lineEnding = '\n',
     hasBom = false,
     originalSerializedContent = null
@@ -1013,6 +1201,7 @@ function setDocument(
   state.revision = 0;
   state.savedRevision = 0;
   state.currentFilePath = filePath;
+  state.currentFileWritable = fileWritable;
   state.browserFileHandle = browserFileHandle;
   state.textFormat = { lineEnding, hasBom };
   // Keep an exact source bypass for Toast UI documents. CodeMirror already
@@ -1023,6 +1212,10 @@ function setDocument(
     ? null
     : (originalSerializedContent ?? serializeTextDocument(content, { lineEnding, hasBom }));
   state.documentByteSize = measuredSize;
+  markMobileReaderScrollProgrammatic();
+  readerPanel.scrollTop = 0;
+  largeFileEditor.scrollDOM.scrollTop = 0;
+  dispatchMobileChrome({ type: 'document-change', mode: 'wysiwyg' });
   showEditorPanel();
 
   if (isLargeDocument) {
@@ -1052,12 +1245,14 @@ function openDocument({
   filePath,
   byteSize,
   browserFileHandle = null,
+  fileWritable = canOverwriteOpenedFile(filePath),
   lineEnding = '\n',
   hasBom = false,
   originalSerializedContent = null
 }) {
   const isLargeDocument = setDocument(content, filePath, byteSize, {
     browserFileHandle,
+    fileWritable,
     lineEnding,
     hasBom,
     originalSerializedContent
@@ -1129,11 +1324,15 @@ async function performSave(saveAs, snapshot) {
     const targetBrowserHandle = !saveAs && isCurrentDocument
       ? state.browserFileHandle
       : snapshot.browserFileHandle;
+    const targetFileWritable = !saveAs && isCurrentDocument
+      ? state.currentFileWritable
+      : snapshot.fileWritable;
     const result = await saveMarkdownFile({
       filePath: targetFilePath,
       content: materialized.serializedContent,
       saveAs,
-      browserFileHandle: targetBrowserHandle
+      browserFileHandle: targetBrowserHandle,
+      fileWritable: targetFileWritable
     });
     const resultStatus = classifySaveResult(result);
 
@@ -1156,6 +1355,7 @@ async function performSave(saveAs, snapshot) {
     }
 
     state.currentFilePath = result.filePath;
+    state.currentFileWritable = result.fileWritable ?? snapshot.fileWritable;
     state.browserFileHandle = result.browserFileHandle || snapshot.browserFileHandle;
     state.savedRevision = snapshot.revision;
     state.lastSavedContent = state.isLargeDocument ? null : materialized.content;
@@ -1190,6 +1390,7 @@ function captureSaveSnapshot() {
     documentId: state.documentId,
     revision: state.revision,
     filePath: state.currentFilePath,
+    fileWritable: state.currentFileWritable,
     browserFileHandle: state.browserFileHandle,
     content,
     documentText: state.isLargeDocument ? largeFileEditor.state.doc : null,
@@ -1214,6 +1415,8 @@ function saveFile(saveAs = false) {
 
 function setMode(mode) {
   state.mode = mode;
+  markMobileReaderScrollProgrammatic();
+  dispatchMobileChrome({ type: 'mode-change', mode });
 
   if (state.isLargeDocument) {
     showEditorPanel();
@@ -1271,6 +1474,16 @@ controls.saveAsButton.addEventListener('click', () => saveFile(true));
 controls.wysiwygMode.addEventListener('click', () => setMode('wysiwyg'));
 controls.markdownMode.addEventListener('click', () => setMode('markdown'));
 controls.readerMode.addEventListener('click', () => setMode('reader'));
+mobileChromeToggle.addEventListener('click', () => {
+  dispatchMobileChrome({ type: 'toggle' });
+});
+readerPanel.addEventListener('scroll', scheduleMobileReaderScroll, { passive: true });
+largeFileEditor.scrollDOM.addEventListener('scroll', scheduleMobileReaderScroll, {
+  passive: true
+});
+mobileLayoutQuery.addEventListener('change', (event) => {
+  dispatchMobileChrome({ type: 'viewport-change', mobile: event.matches });
+});
 themeSelect.addEventListener('change', () => {
   const theme = applyTheme(themeSelect.value);
   themeSelect.value = theme;
@@ -1319,6 +1532,7 @@ window.addEventListener('beforeunload', (event) => {
 
 updateTitle();
 updateModeButtons();
+renderMobileChrome();
 updateSavingState();
 updateCounts();
-openInitialLaunchFile();
+void initializeNativeFileOpenHandling();

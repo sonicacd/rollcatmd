@@ -4,9 +4,9 @@
 
 # 滚猫md / rollcat-md
 
-一款轻量的 Windows Markdown 阅读与编辑软件，支持所见即所得、源码编辑、专注阅读，以及面向大文件的可视区分块渲染。
+一款轻量的 Windows 与 Android Markdown 阅读与编辑软件，支持所见即所得、源码编辑、专注阅读，以及面向大文件的可视区分块渲染。
 
-A lightweight Windows Markdown reader and editor with WYSIWYG editing, source editing, focused reading, and viewport rendering for large files.
+A lightweight Windows and Android Markdown reader and editor with WYSIWYG editing, source editing, focused reading, and viewport rendering for large files.
 
 [中文说明](#中文说明) · [English Guide](#english-guide)
 
@@ -24,6 +24,14 @@ A lightweight Windows Markdown reader and editor with WYSIWYG editing, source ed
 
 滚猫md使用 Windows 的 Microsoft Edge WebView2 Runtime。Windows 10/11 通常已经安装；如果程序无法启动，请先安装或修复 WebView2 Runtime。
 
+### Android 版
+
+Android 版使用系统文件选择器，不申请整盘存储权限。从系统选择器打开的文件会作为导入文档；第一次点击“保存”时会让你选择导出位置，之后在当前会话中可直接覆盖该导出文档。
+
+移动端顶部提供收起按钮。阅读模式向下滚动超过 40px 后会自动进入沉浸阅读：顶部缩成文件名栏，底部模式按钮暂时隐藏；回到文档顶部会自动展开，也可以随时点击顶部箭头手动切换。
+
+本地构建需要 Android SDK 36、NDK、JDK 和 Rust Android target。初次生成工程后，使用 `npm run dist:android` 生成 ARM64 APK。
+
 ### 快速上手
 
 1. 点击“新建”创建文档，或点击“打开”选择已有文件。
@@ -31,7 +39,7 @@ A lightweight Windows Markdown reader and editor with WYSIWYG editing, source ed
 3. 编辑完成后点击“保存”；需要保留原文件时使用“另存为”。
 4. 从“主题”菜单选择纯黑、纯白或护眼主题。
 
-当前文件名显示在 Windows 窗口标题栏中。标题末尾出现 `*` 时，表示文档还有未保存的修改。界面同时显示当前文档的字符数和 LLM token 估算值。
+当前文件名显示在 Windows 窗口标题栏或 Android 顶部应用栏中。名称后出现圆点或标题末尾出现 `*` 时，表示文档还有未保存的修改。界面同时显示当前文档的字符数和 LLM token 估算值。
 
 token 数会显示为“约 N tokens”。这是不依赖网络或特定模型的快速估算，不同 LLM、不同版本分词器得到的精确结果可能不同。
 
@@ -177,6 +185,14 @@ The standalone EXE does not create Start-menu shortcuts or automatically change 
 
 rollcat-md uses the Microsoft Edge WebView2 Runtime included with most Windows 10 and Windows 11 systems. If the app does not start, install or repair WebView2 Runtime first.
 
+### Android
+
+The Android build uses the system document picker and does not request broad storage access. A file selected for opening is imported read-only; the first **Save** asks for an export destination, and that exported document can then be overwritten for the rest of the current session.
+
+The mobile app bar includes a collapse control. Scrolling more than 40px in Reader view automatically enters focused reading: the top bar shrinks to the filename and the bottom mode controls slide away. Returning to the document top expands them, and the top arrow can toggle them at any time.
+
+Local builds require Android SDK 36, the NDK, a JDK, and the Rust Android targets. After the Android project has been initialized, run `npm run dist:android` to produce an ARM64 APK.
+
 ### Quick Start
 
 1. Select **New** to create a document, or **Open** to choose an existing file.
@@ -184,7 +200,7 @@ rollcat-md uses the Microsoft Edge WebView2 Runtime included with most Windows 1
 3. Select **Save** after editing, or **Save As** to keep the original file unchanged.
 4. Choose Black, White, or Eye Comfort from the Theme menu.
 
-The current filename appears in the Windows title bar. A trailing `*` means that the document has unsaved changes. The interface also shows a live character count and an estimated LLM token count.
+The current filename appears in the Windows title bar or the Android app bar. A trailing `*` or a dot beside the Android filename means that the document has unsaved changes. The interface also shows a live character count and an estimated LLM token count.
 
 Tokens are displayed as “approximately N tokens.” This is a fast, model-independent estimate that requires no network access. Exact results vary between LLMs and tokenizer versions.
 

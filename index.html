@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' tauri: asset: data: blob:; img-src 'self' tauri: asset: file: data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost;">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <title>滚猫md</title>
 </head>
 <body>
@@ -15,21 +15,40 @@
         </div>
       </div>
 
-      <nav class="toolbar" aria-label="文件操作">
+      <div class="mobile-document-meta" aria-label="当前文档">
+        <span id="mobileDocumentName">未命名.md</span>
+        <span id="mobileDirtyState" aria-hidden="true"></span>
+      </div>
+
+      <button
+        class="mobile-chrome-toggle"
+        id="mobileChromeToggle"
+        type="button"
+        aria-expanded="true"
+        aria-controls="mobileFileToolbar mobileModeSwitch mobileThemeControl mobileFormattingToolbar"
+        title="收起界面控件"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="m6.5 14.5 5.5-5 5.5 5"></path>
+        </svg>
+        <span class="mobile-chrome-toggle-label">收起界面控件</span>
+      </button>
+
+      <nav class="toolbar" id="mobileFileToolbar" aria-label="文件操作">
         <button class="tool-button" id="newButton" type="button" aria-keyshortcuts="Control+N Meta+N">新建</button>
         <button class="tool-button" id="openButton" type="button" aria-keyshortcuts="Control+O Meta+O">打开</button>
         <button class="tool-button primary" id="saveButton" type="button" aria-keyshortcuts="Control+S Meta+S">保存</button>
         <button class="tool-button" id="saveAsButton" type="button" aria-keyshortcuts="Control+Shift+S Meta+Shift+S">另存为</button>
       </nav>
 
-      <div class="mode-switch" role="group" aria-label="编辑模式">
+      <div class="mode-switch" id="mobileModeSwitch" role="group" aria-label="编辑模式">
         <span class="meta-label">视图</span>
         <button class="mode-button active" id="wysiwygMode" type="button" aria-pressed="true" aria-keyshortcuts="Control+1 Meta+1">所见即所得</button>
         <button class="mode-button" id="markdownMode" type="button" aria-pressed="false" aria-keyshortcuts="Control+2 Meta+2">源码</button>
         <button class="mode-button" id="readerMode" type="button" aria-pressed="false" aria-keyshortcuts="Control+3 Meta+3">阅读</button>
       </div>
 
-      <label class="theme-control" for="themeSelect">
+      <label class="theme-control" id="mobileThemeControl" for="themeSelect">
         <span class="meta-label">主题</span>
         <select id="themeSelect" aria-label="界面主题">
           <option value="black">纯黑</option>

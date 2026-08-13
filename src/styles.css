@@ -254,6 +254,32 @@ button {
   height: 100%;
 }
 
+.mobile-document-meta {
+  display: none;
+}
+
+.mobile-chrome-toggle {
+  display: none;
+}
+
+.mobile-chrome-toggle-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+html.android-runtime .mobile-document-meta {
+  display: flex;
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+}
+
 .meta-label {
   color: var(--muted);
   font-size: 12px;
@@ -306,7 +332,8 @@ button {
 
 .theme-control select:focus-visible,
 .tool-button:focus-visible,
-.mode-button:focus-visible {
+.mode-button:focus-visible,
+.mobile-chrome-toggle:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -1262,5 +1289,398 @@ button {
   .toastui-editor-ww-container .ProseMirror,
   .toastui-editor-md-preview .toastui-editor-contents {
     padding: 18px 18px 56px;
+  }
+}
+
+/* Android/phone layout: system-safe top actions and a thumb-friendly mode bar. */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+
+button,
+select {
+  touch-action: manipulation;
+}
+
+@media (max-width: 820px) {
+  :root {
+    --mobile-mode-bar-height: 52px;
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+
+  .app-shell {
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .sidebar {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 80px 44px;
+    grid-template-rows: 44px 44px;
+    gap: 4px 6px;
+    align-items: center;
+    padding: max(4px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 4px max(8px, env(safe-area-inset-left));
+    border-bottom: 1px solid var(--line);
+    transition: padding 180ms ease, grid-template-columns 180ms ease;
+  }
+
+  .brand {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    transition: width 180ms ease, height 180ms ease;
+  }
+
+  .mobile-document-meta {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    align-items: center;
+    align-self: start;
+    padding-top: 3px;
+    color: var(--text-strong);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  #mobileDocumentName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #mobileDirtyState {
+    flex: 0 0 auto;
+    color: var(--accent-strong);
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .theme-control {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .theme-control .meta-label {
+    display: none;
+  }
+
+  .theme-control select {
+    width: 80px;
+    min-width: 80px;
+    height: 44px;
+    padding: 0 22px 0 8px;
+    font-size: 14px;
+  }
+
+  .mobile-chrome-toggle {
+    display: grid;
+    grid-column: 4;
+    grid-row: 1;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--button-bg);
+    color: var(--text-strong);
+    cursor: pointer;
+  }
+
+  .mobile-chrome-toggle svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    transition: transform 180ms ease;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(4, minmax(60px, 64px));
+    justify-content: center;
+    width: 100%;
+    gap: 6px;
+    margin: 0;
+  }
+
+  .toolbar .tool-button,
+  .mode-switch .mode-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 4px;
+    font-size: 13px;
+  }
+
+  .statusbar {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    padding: 0;
+    align-self: end;
+    padding-bottom: 3px;
+    overflow: hidden;
+    border: 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.2;
+    clip: auto;
+    clip-path: none;
+  }
+
+  #countText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mode-switch {
+    position: fixed;
+    z-index: 50;
+    right: auto;
+    bottom: 0;
+    left: 50%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    width: min(320px, calc(100vw - 24px));
+    padding: 4px 4px max(4px, env(safe-area-inset-bottom));
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    border-radius: 11px 11px 0 0;
+    background: var(--sidebar-raised);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08);
+    transform: translateX(-50%);
+    transition: opacity 160ms ease, transform 180ms ease, visibility 180ms;
+  }
+
+  .mode-switch .meta-label {
+    display: none;
+  }
+
+  .mode-switch #wysiwygMode {
+    min-width: 0;
+  }
+
+  .main-area {
+    min-height: 0;
+    padding-bottom: calc(var(--mobile-mode-bar-height) + env(safe-area-inset-bottom));
+  }
+
+  .workspace {
+    padding: 6px max(6px, env(safe-area-inset-right)) 6px max(6px, env(safe-area-inset-left));
+  }
+
+  .editor-panel,
+  .reader-panel,
+  .toastui-editor-defaultUI {
+    border-radius: 7px;
+  }
+
+  .toastui-editor-defaultUI-toolbar {
+    height: 52px;
+    padding: 0 4px;
+  }
+
+  .toastui-editor-toolbar {
+    height: 52px;
+  }
+
+  .toastui-editor-defaultUI-toolbar button {
+    width: 44px;
+    height: 44px;
+    margin: 4px 0;
+  }
+
+  .toastui-editor-defaultUI-toolbar button.toastui-editor-toolbar-icons {
+    padding: 6px;
+    background-clip: content-box;
+    background-origin: content-box;
+  }
+
+  .toastui-editor-main {
+    height: calc(100% - 52px);
+  }
+
+  .toastui-editor-md-container.toastui-editor-md-vertical-style > .toastui-editor.md-mode {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
+
+  .toastui-editor-md-container.toastui-editor-md-vertical-style > .toastui-editor-md-splitter,
+  .toastui-editor-md-container.toastui-editor-md-vertical-style > .toastui-editor-md-preview {
+    display: none !important;
+  }
+
+  .toastui-editor-dropdown-toolbar {
+    max-width: calc(100vw - 16px);
+    max-height: min(55dvh, 320px);
+    height: auto;
+    flex-wrap: wrap;
+    overflow-y: auto;
+  }
+
+  .toastui-editor-popup {
+    max-width: calc(100vw - 16px);
+  }
+
+  .toastui-editor-ww-container .ProseMirror,
+  .toastui-editor-md-preview .toastui-editor-contents {
+    padding: 18px 16px calc(48px + env(safe-area-inset-bottom));
+  }
+
+  #viewer {
+    padding: 18px 16px calc(38px + env(safe-area-inset-bottom));
+  }
+
+  #statusText.visible {
+    position: fixed;
+    z-index: 80;
+    bottom: calc(var(--mobile-mode-bar-height) + env(safe-area-inset-bottom) + 12px);
+    left: 50%;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    height: auto;
+    padding: 9px 13px;
+    overflow: visible;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--text-strong);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    color: var(--surface);
+    font-size: 13px;
+    line-height: 1.3;
+    text-align: center;
+    white-space: normal;
+    clip: auto;
+    clip-path: none;
+    transform: translateX(-50%);
+  }
+
+  html.mobile-chrome-collapsed {
+    --mobile-mode-bar-height: 0px;
+  }
+
+  html.mobile-chrome-collapsed .sidebar {
+    grid-template-columns: 28px minmax(0, 1fr) 44px;
+    grid-template-rows: 44px;
+    gap: 0 6px;
+  }
+
+  html.mobile-chrome-collapsed .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  html.mobile-chrome-collapsed .mobile-document-meta {
+    grid-column: 2;
+    align-self: center;
+    padding-top: 0;
+  }
+
+  html.mobile-chrome-collapsed .mobile-chrome-toggle {
+    grid-column: 3;
+  }
+
+  html.mobile-chrome-collapsed .mobile-chrome-toggle svg {
+    transform: rotate(180deg);
+  }
+
+  html.mobile-chrome-collapsed .toolbar,
+  html.mobile-chrome-collapsed .theme-control,
+  html.mobile-chrome-collapsed #countText {
+    display: none;
+  }
+
+  html.mobile-chrome-collapsed #editor .toastui-editor-toolbar {
+    display: none;
+  }
+
+  html.mobile-chrome-collapsed #editor .toastui-editor-main {
+    height: 100%;
+  }
+
+  html.mobile-chrome-collapsed .statusbar {
+    position: absolute;
+    width: 0;
+    height: 0;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+  }
+
+  html.mobile-chrome-collapsed .mode-switch {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, calc(100% + env(safe-area-inset-bottom) + 12px));
+  }
+
+  html.mobile-chrome-collapsed .main-area {
+    padding-bottom: 0;
+  }
+
+  html.mobile-chrome-collapsed #statusText.visible {
+    bottom: calc(env(safe-area-inset-bottom) + 12px);
+  }
+}
+
+@media (max-width: 380px) {
+  .sidebar {
+    column-gap: 6px;
+  }
+
+  .theme-control select {
+    width: 76px;
+    min-width: 76px;
+  }
+
+  .toolbar {
+    gap: 5px;
+  }
+
+  .toolbar .tool-button,
+  .mode-switch .mode-button {
+    font-size: 13px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .tool-button:active,
+  .mode-button:active,
+  .toastui-editor-defaultUI-toolbar button:not(:disabled):active {
+    border-color: var(--line-strong);
+    background: var(--button-hover-bg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .brand-mark,
+  .mobile-chrome-toggle svg,
+  .mode-switch {
+    transition: none;
   }
 }

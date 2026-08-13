@@ -1,7 +1,7 @@
 {
   "name": "rollcat-md",
-  "version": "0.2.0",
-  "description": "rollcat-md — a lightweight Markdown reader and editor for Windows.",
+  "version": "0.3.0",
+  "description": "rollcat-md — a lightweight Markdown reader and editor for Windows and Android.",
   "author": "sonicacd",
   "license": "Apache-2.0",
   "repository": {
@@ -17,11 +17,14 @@
     "build:renderer": "vite build --outDir dist-renderer --emptyOutDir",
     "test": "node --test",
     "postinstall": "patch-package",
-    "dev:vite": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "dev:vite": "vite",
     "dev": "tauri dev",
     "start": "tauri dev",
+    "android:init": "tauri android init",
+    "dev:android": "tauri android dev",
     "dist": "tauri build --no-bundle",
-    "dist:win": "tauri build --no-bundle"
+    "dist:win": "tauri build --no-bundle",
+    "dist:android": "tauri android build --apk --target aarch64"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

@@ -1,12 +1,16 @@
 [package]
 name = "rollcat-md"
-version = "0.2.0"
-description = "rollcat-md — a lightweight Markdown reader and editor for Windows."
+version = "0.3.0"
+description = "rollcat-md — a lightweight Markdown reader and editor for Windows and Android."
 authors = ["sonicacd"]
 license = "Apache-2.0"
 repository = "https://github.com/sonicacd/rollcatmd"
 homepage = "https://github.com/sonicacd/rollcatmd"
 edition = "2021"
+
+[lib]
+name = "rollcat_md_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

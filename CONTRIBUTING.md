@@ -52,6 +52,22 @@ npm run dist:win
 
 The output is written to `src-tauri/target/release/rollcat-md.exe`.
 
+### Android 开发 / Android development
+
+Android 构建另外需要 JDK、Android SDK Platform 36、Build-Tools 36、Platform-Tools、NDK（Side by side），以及 Rust Android targets。设置 `JAVA_HOME`、`ANDROID_HOME` 和 `NDK_HOME` 后，执行：
+
+Android builds additionally require a JDK, Android SDK Platform 36, Build-Tools 36, Platform-Tools, an NDK (Side by side), and the Rust Android targets. After setting `JAVA_HOME`, `ANDROID_HOME`, and `NDK_HOME`, run:
+
+```powershell
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+npm run android:init
+npm run dist:android
+```
+
+`android:init` 只用于尚未生成 `src-tauri/gen/android` 的工作树。`dist:android` 默认构建适用于现代 Android 真机的 ARM64 APK。
+
+Run `android:init` only when `src-tauri/gen/android` has not been generated yet. `dist:android` builds an ARM64 APK for modern physical Android devices.
+
 ## 提交代码 / Pull requests
 
 - 每个提交尽量只解决一个明确问题。
