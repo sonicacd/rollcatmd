@@ -3,9 +3,11 @@
 /dist-renderer/
 /src-tauri/target/
 /release/
+/.android-toolchain/
 
 # Local development state
 /.agents/
+/.backups/
 /.codex/
 /.vscode/
 /.idea/
@@ -17,8 +19,7 @@
 *.log
 npm-debug.log*
 
-# Windows-only project: ignore unused generated mobile/macOS icons
-/src-tauri/icons/android/
+# Ignore currently unused generated Apple icons
 /src-tauri/icons/ios/
 /src-tauri/icons/icon.icns
 /src-tauri/icons/64x64.png

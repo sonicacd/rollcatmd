@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.sonicacd.rollcatmd",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "滚猫md",
+        "backgroundColor": "#f5f1ea"
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "android": {
+      "minSdkVersion": 24
+    },
+    "fileAssociations": [
+      {
+        "name": "Markdown 文档",
+        "ext": ["md", "markdown", "mdown", "mkd"],
+        "mimeType": "text/markdown",
+        "role": "Editor",
+        "androidIntentActionFilters": ["view", "send"]
+      },
+      {
+        "name": "文本文档",
+        "ext": ["txt"],
+        "mimeType": "text/plain",
+        "role": "Editor",
+        "androidIntentActionFilters": ["view", "send"]
+      }
+    ]
+  }
+}
