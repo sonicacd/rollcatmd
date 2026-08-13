@@ -100,3 +100,11 @@ test('theme CSS defines pure canvases and shared editor color tokens', () => {
   assert.doesNotMatch(themeCss, /#(?:9b87f5|c8bfff|d8d0ff|2c2738|24212d|201e27|2a2633|191820)\b/i);
   assert.doesNotMatch(themeCss, /rgba?\(155,\s*135,\s*245/i);
 });
+
+test('selection styling does not change text color', () => {
+  const selectionRule = themeCss.match(/(?:^|\n)::selection\s*\{([^}]*)\}/)?.[1];
+
+  assert.ok(selectionRule, 'global selection rule should exist');
+  assert.match(selectionRule, /background:\s*var\(--selection\);/);
+  assert.doesNotMatch(selectionRule, /(?:^|[;\s])color\s*:/);
+});
