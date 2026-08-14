@@ -62,12 +62,13 @@ test('leaving reader mode restores the controls and disables automatic collapse'
   assert.equal(isMobileChromeCollapsed(scroll(markdown, 500)), false);
 });
 
-test('wide layouts ignore collapse toggles and reading scroll', () => {
+test('wide layouts allow manual collapse without reacting to reading scroll', () => {
   const desktopReader = createMobileChromeState({ mobile: false, mode: 'reader' });
   const toggled = reduceMobileChrome(desktopReader, { type: 'toggle' });
 
-  assert.equal(toggled, desktopReader);
+  assert.equal(isMobileChromeCollapsed(toggled), true);
   assert.equal(isMobileChromeCollapsed(scroll(desktopReader, 500)), false);
+  assert.equal(isMobileChromeCollapsed(scroll(toggled, 500)), true);
 });
 
 test('editing modes can still be compacted explicitly', () => {
