@@ -27,7 +27,7 @@ test('regular documents use the Obsidian-derived reading rhythm at every view', 
   assert.doesNotMatch(styles, /line-height:\s*1\.78;/);
 });
 
-test('document width is fluid and capped at 1200 pixels', () => {
+test('document content is capped at 1200 pixels while the WYSIWYG scroller stays full width', () => {
   assert.match(styles, /--document-max-width:\s*1200px;/);
   assert.match(
     styles,
@@ -35,7 +35,15 @@ test('document width is fluid and capped at 1200 pixels', () => {
   );
   assert.match(
     styles,
-    /\.toastui-editor-ww-container \.ProseMirror\s*\{[^}]*width:\s*min\(100%, var\(--document-layout-max-width\)\);[^}]*max-width:\s*var\(--document-layout-max-width\);[^}]*margin:\s*0 auto;[^}]*padding:\s*32px 36px/s
+    /\.toastui-editor-ww-container \.ProseMirror\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*none;[^}]*margin:\s*0;[^}]*padding:\s*32px max\(36px, calc\(\(100% - var\(--document-max-width\)\) \/ 2\)\) (?:58|64)px;/s
+  );
+  assert.match(
+    styles,
+    /\.toastui-editor-ww-container\s*\{[^}]*overflow:\s*hidden;/s
+  );
+  assert.doesNotMatch(
+    styles,
+    /\.toastui-editor-ww-container \.ProseMirror\s*\{[^}]*(?:width:\s*min\(100%, var\(--document-layout-max-width\)\)|max-width:\s*var\(--document-layout-max-width\)|margin:\s*0 auto;)[^}]*\}/s
   );
   assert.match(
     styles,
@@ -45,9 +53,9 @@ test('document width is fluid and capped at 1200 pixels', () => {
     styles,
     /\.toastui-editor-md-preview \.toastui-editor-contents\s*\{[^}]*width:\s*min\(100%, var\(--document-layout-max-width\)\);[^}]*max-width:\s*var\(--document-layout-max-width\);[^}]*margin:\s*0 auto;[^}]*padding:\s*32px 36px/s
   );
-  assert.doesNotMatch(
+  assert.match(
     styles,
-    /\.toastui-editor-ww-container \.ProseMirror\s*\{[^}]*max-width:\s*none;/s
+    /@media \(max-width:\s*820px\)[\s\S]*?\.toastui-editor-ww-container \.ProseMirror,\s*\.toastui-editor-md-preview \.toastui-editor-contents\s*\{[^}]*padding:\s*18px 16px calc\(48px \+ env\(safe-area-inset-bottom\)\);/s
   );
 });
 
