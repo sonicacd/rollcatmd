@@ -24,6 +24,8 @@ A lightweight Windows and Android Markdown reader and editor with WYSIWYG editin
 
 滚猫md使用 Windows 的 Microsoft Edge WebView2 Runtime。Windows 10/11 通常已经安装；如果程序无法启动，请先安装或修复 WebView2 Runtime。
 
+桌面端顶部工具栏右侧提供收起按钮；收起后会保留当前文档名和展开按钮，并为编辑区腾出更多空间。
+
 ### Android 版
 
 Android 版使用系统文件选择器，不申请整盘存储权限。从系统选择器打开的文件会作为导入文档；第一次点击“保存”时会让你选择导出位置，之后在当前会话中可直接覆盖该导出文档。

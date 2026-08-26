@@ -258,7 +258,35 @@ button {
 }
 
 .mobile-chrome-toggle {
-  display: none;
+  display: grid;
+  flex: 0 0 32px;
+  order: 10;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--button-bg);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.mobile-chrome-toggle:hover {
+  border-color: var(--line-strong);
+  background: var(--button-hover-bg);
+}
+
+.mobile-chrome-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  transition: transform 180ms ease;
 }
 
 .mobile-chrome-toggle-label {
@@ -792,7 +820,13 @@ html.android-runtime .mobile-document-meta {
   color: var(--muted-soft);
 }
 
-.toastui-editor-ww-container .ProseMirror,
+.toastui-editor-ww-container .ProseMirror {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 32px max(36px, calc((100% - var(--document-max-width)) / 2)) 58px;
+}
+
 .toastui-editor-md-preview .toastui-editor-contents {
   width: min(100%, var(--document-layout-max-width));
   max-width: var(--document-layout-max-width);
@@ -1318,15 +1352,15 @@ html.android-runtime .mobile-document-meta {
 }
 
 .toastui-editor-ww-container {
-  overflow: auto;
+  overflow: hidden;
 }
 
 .toastui-editor-ww-container .ProseMirror {
-  width: min(100%, var(--document-layout-max-width));
-  max-width: var(--document-layout-max-width);
+  width: 100%;
+  max-width: none;
   min-height: 100%;
-  margin: 0 auto;
-  padding: 32px 36px 64px;
+  margin: 0;
+  padding: 32px max(36px, calc((100% - var(--document-max-width)) / 2)) 64px;
 }
 
 .toastui-editor-md-preview .toastui-editor-contents {
@@ -1341,6 +1375,53 @@ html.android-runtime .mobile-document-meta {
   max-width: var(--document-max-width);
   margin: 0 auto;
   padding: 0;
+}
+
+/* Desktop toolbar collapse keeps a compact document strip and restores the editor height. */
+@media (min-width: 821px) {
+  html.mobile-chrome-collapsed .sidebar {
+    flex-wrap: nowrap;
+  }
+
+  html.mobile-chrome-collapsed .mobile-document-meta {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    overflow: hidden;
+    color: var(--text-strong);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  html.mobile-chrome-collapsed #mobileDocumentName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html.mobile-chrome-collapsed #mobileDirtyState {
+    flex: 0 0 auto;
+    color: var(--accent-strong);
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  html.mobile-chrome-collapsed .mobile-chrome-toggle svg {
+    transform: rotate(180deg);
+  }
+
+  html.mobile-chrome-collapsed .toolbar,
+  html.mobile-chrome-collapsed .mode-switch,
+  html.mobile-chrome-collapsed .theme-control,
+  html.mobile-chrome-collapsed #countText,
+  html.mobile-chrome-collapsed #editor .toastui-editor-toolbar {
+    display: none;
+  }
+
+  html.mobile-chrome-collapsed #editor .toastui-editor-main {
+    height: 100%;
+  }
 }
 
 @media (max-width: 700px) {
