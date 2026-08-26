@@ -23,7 +23,7 @@ export function createMobileChromeState({ mobile = false, mode = 'wysiwyg' } = {
 }
 
 export function isMobileChromeCollapsed(state) {
-  return state.mobile && state.density === MOBILE_CHROME_DENSITY.COMPACT;
+  return state.density === MOBILE_CHROME_DENSITY.COMPACT;
 }
 
 export function reduceMobileChrome(state, event) {
@@ -49,10 +49,6 @@ export function reduceMobileChrome(state, event) {
       });
 
     case 'toggle': {
-      if (!current.mobile) {
-        return current;
-      }
-
       return {
         ...current,
         density: isMobileChromeCollapsed(current)
