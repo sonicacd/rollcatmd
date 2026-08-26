@@ -34,11 +34,12 @@
         <span class="mobile-chrome-toggle-label">收起界面控件</span>
       </button>
 
-      <nav class="toolbar" id="mobileFileToolbar" aria-label="文件操作">
+      <nav class="toolbar" id="mobileFileToolbar" aria-label="文件和帮助操作">
         <button class="tool-button" id="newButton" type="button" aria-keyshortcuts="Control+N Meta+N">新建</button>
         <button class="tool-button" id="openButton" type="button" aria-keyshortcuts="Control+O Meta+O">打开</button>
         <button class="tool-button primary" id="saveButton" type="button" aria-keyshortcuts="Control+S Meta+S">保存</button>
         <button class="tool-button" id="saveAsButton" type="button" aria-keyshortcuts="Control+Shift+S Meta+Shift+S">另存为</button>
+        <button class="tool-button" id="helpButton" type="button" aria-haspopup="dialog" aria-controls="helpDialog">帮助</button>
       </nav>
 
       <div class="mode-switch" id="mobileModeSwitch" role="group" aria-label="编辑模式">
@@ -110,6 +111,91 @@
       </div>
     </main>
   </div>
+
+  <dialog
+    class="help-dialog"
+    id="helpDialog"
+    aria-labelledby="helpDialogTitle"
+    aria-describedby="helpDialogSummary"
+  >
+    <div class="help-dialog-frame">
+      <header class="help-dialog-header">
+        <div>
+          <div class="help-dialog-kicker">滚猫md</div>
+          <h2 id="helpDialogTitle">使用帮助</h2>
+        </div>
+        <button
+          class="help-dialog-close"
+          id="closeHelpButton"
+          type="button"
+          title="关闭（Esc）"
+          aria-label="关闭帮助"
+          aria-keyshortcuts="Escape"
+        >×</button>
+      </header>
+
+      <div class="help-dialog-content">
+        <p class="help-dialog-summary" id="helpDialogSummary">
+          文档始终在本地打开和保存；以下操作在 Windows 版和支持键盘的设备上均可使用。
+        </p>
+
+        <div class="help-grid">
+          <section class="help-section" aria-labelledby="helpFilesTitle">
+            <h3 id="helpFilesTitle">文件</h3>
+            <dl class="help-shortcut-list">
+              <div><dt>新建</dt><dd><kbd>Ctrl</kbd> + <kbd>N</kbd></dd></div>
+              <div><dt>打开</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div>
+              <div><dt>保存</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div>
+              <div><dt>另存为</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></dd></div>
+            </dl>
+            <p>
+              Windows 版可将 <code>.md</code>、<code>.markdown</code>、<code>.mdown</code>、<code>.mkd</code> 或 <code>.txt</code>
+              直接拖到窗口打开。
+            </p>
+          </section>
+
+          <section class="help-section" aria-labelledby="helpViewsTitle">
+            <h3 id="helpViewsTitle">视图</h3>
+            <dl class="help-shortcut-list">
+              <div><dt>所见即所得</dt><dd><kbd>Ctrl</kbd> + <kbd>1</kbd></dd></div>
+              <div><dt>源码</dt><dd><kbd>Ctrl</kbd> + <kbd>2</kbd></dd></div>
+              <div><dt>阅读</dt><dd><kbd>Ctrl</kbd> + <kbd>3</kbd></dd></div>
+            </dl>
+            <p>
+              三个模式中打开查找和替换都会保持当前界面；阅读模式也允许替换，内容会即时刷新。
+            </p>
+          </section>
+
+          <section class="help-section" aria-labelledby="helpFindTitle">
+            <h3 id="helpFindTitle">查找和替换</h3>
+            <dl class="help-shortcut-list">
+              <div><dt>打开面板</dt><dd><kbd>Ctrl</kbd> + <kbd>F</kbd></dd></div>
+              <div><dt>下一个</dt><dd><kbd>Enter</kbd></dd></div>
+              <div><dt>上一个</dt><dd><kbd>Shift</kbd> + <kbd>Enter</kbd></dd></div>
+              <div><dt>关闭</dt><dd><kbd>Esc</kbd></dd></div>
+            </dl>
+            <p>
+              查找和替换均支持 <code>\n</code>（换行）、<code>\r</code>（回车）、
+              <code>\t</code>（制表符）和 <code>\\</code>（反斜杠）。
+            </p>
+            <p class="help-example">
+              <strong>合并空行：</strong>查找 <code>\n\n</code>，替换为 <code>\n</code>。
+            </p>
+          </section>
+
+          <section class="help-section" aria-labelledby="helpSafetyTitle">
+            <h3 id="helpSafetyTitle">保存与安全</h3>
+            <ul class="help-note-list">
+              <li>程序不会自动保存，标题栏的 <code>*</code> 表示有未保存更改。</li>
+              <li>仅打开有效的 UTF-8 文本（可带 UTF-8 BOM）；其他编码会被拒绝，防止乱码覆盖原文件。</li>
+              <li>保存采用安全替换流程，并尽量保留 BOM 和原文档的换行风格。</li>
+              <li>重要文件仍建议另行备份。</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <script type="module" src="/src/renderer.js"></script>
 </body>
