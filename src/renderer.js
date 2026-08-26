@@ -57,10 +57,13 @@ import {
   reduceMobileChrome
 } from './mobile-chrome.js';
 import {
+  buildMarkdownAstFindSnapshot,
   buildMappedTextBlocks,
   decodeFindReplaceEscapes,
   findMatchIndex,
   findTextMatches,
+  mapVisibleFindSnapshotToSource,
+  mappedTextNodeId,
   mappedTextOffsetAtPosition,
   mappedTextRange,
   offsetToMarkdownPosition,
@@ -1559,37 +1562,36 @@ function createWysiwygFindSnapshot() {
 
 function createReaderFindSnapshot() {
   const markdown = getCurrentMarkdown();
-  const canBuildModel =
-    editor.mdEditor?.setMarkdown &&
-    editor.toastMark?.getRootNode &&
-    editor.convertor?.toWysiwygModel &&
-    editor.convertor?.toMarkdownText &&
-    editor.wwEditor?.setModel &&
-    editor.wwEditor?.getModel;
+  const root = viewer?.toastMark?.getRootNode?.();
+  const visibleSnapshot = createVisibleFindSnapshot(viewerElement, {
+    includeNodeIds: true
+  });
 
-  if (!canBuildModel) {
+  if (!root) {
     return {
       kind: 'reader-readonly',
-      ...createVisibleFindSnapshot(viewerElement)
+      ...visibleSnapshot
     };
   }
 
-  const releaseSuppression = beginSuppressChanges();
-  try {
-    editor.mdEditor.setMarkdown(markdown, false);
-    const markdownNode = editor.toastMark.getRootNode();
-    editor.wwEditor.setModel(editor.convertor.toWysiwygModel(markdownNode), false);
-  } finally {
-    releaseSuppression();
-  }
+  const nodeIdCounts = new Map();
+  viewerElement.querySelectorAll('[data-nodeid]').forEach((element) => {
+    const nodeId = Number(element.getAttribute('data-nodeid'));
+    if (Number.isFinite(nodeId)) {
+      nodeIdCounts.set(nodeId, (nodeIdCounts.get(nodeId) || 0) + 1);
+    }
+  });
+  const invalidNodeIds = [...nodeIdCounts]
+    .filter(([, count]) => count !== 1)
+    .map(([nodeId]) => nodeId);
+  const sourceSnapshot = buildMarkdownAstFindSnapshot(markdown, root);
 
-  const snapshot = createWysiwygFindSnapshot();
-  return snapshot.kind === 'wysiwyg'
-    ? { ...snapshot, kind: 'reader' }
-    : {
-      kind: 'reader-readonly',
-      ...createVisibleFindSnapshot(viewerElement)
-    };
+  return {
+    kind: 'reader',
+    ...mapVisibleFindSnapshotToSource(visibleSnapshot, sourceSnapshot, {
+      invalidNodeIds
+    })
+  };
 }
 
 function getFindSearchSnapshot(query = findReplaceElements.findInput.value) {
@@ -1606,6 +1608,10 @@ function getFindSearchSnapshot(query = findReplaceElements.findInput.value) {
   }
 
   if (state.mode === 'reader') {
+    if (decodeFindReplaceEscapes(query).includes('\n')) {
+      return { kind: 'reader-source', text: getCurrentMarkdown() };
+    }
+
     return createReaderFindSnapshot();
   }
 
@@ -1662,33 +1668,112 @@ const visibleFindBlockSelector = [
   'th'
 ].join(',');
 
-function createVisibleFindSnapshot(root) {
+function createVisibleFindSnapshot(
+  root,
+  { directNodeText = false, includeNodeIds = false } = {}
+) {
   const spans = [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT
+  );
   let text = '';
   let previousBlock = null;
   let previousTextNode = null;
-  let textNode = walker.nextNode();
+  let previousBreakParent = null;
+  let currentNode = walker.nextNode();
 
-  while (textNode) {
-    const value = textNode.nodeValue || '';
+  while (currentNode) {
+    if (currentNode.nodeType === Node.ELEMENT_NODE) {
+      if (currentNode.tagName === 'BR') {
+        const owner = currentNode.parentElement?.closest('[data-nodeid]');
+        if (!directNodeText || owner === root) {
+          text += '\n';
+          spans.push({
+            node: null,
+            beforeNode: previousTextNode,
+            afterNode: null,
+            nodeId: includeNodeIds ? Number(owner?.getAttribute('data-nodeid')) : null,
+            separator: true,
+            replaceable: false
+          });
+          previousBreakParent = currentNode.parentElement;
+        }
+      }
+      currentNode = walker.nextNode();
+      continue;
+    }
+
+    const textNode = currentNode;
+    if (
+      directNodeText &&
+      textNode.parentElement?.closest('[data-nodeid]') !== root
+    ) {
+      currentNode = walker.nextNode();
+      continue;
+    }
+
+    let value = textNode.nodeValue || '';
+    let textNodeOffset = 0;
+    const parent = textNode.parentElement;
+
+    if (parent === previousBreakParent) {
+      const normalizedValue = value.replace(/^\r?\n/, '');
+      textNodeOffset = value.length - normalizedValue.length;
+      value = normalizedValue;
+    }
+    previousBreakParent = null;
+
+    const isPreformatted = Boolean(parent?.closest('pre, code'));
+    const isRendererWhitespace =
+      !isPreformatted &&
+      !value.trim() &&
+      /[\r\n]/.test(value) &&
+      (
+        !parent?.matches('p, h1, h2, h3, h4, h5, h6, li, td, th') ||
+        Boolean(parent?.querySelector(':scope > br'))
+      );
+
+    if (isRendererWhitespace) {
+      currentNode = walker.nextNode();
+      continue;
+    }
+
     const block = textNode.parentElement?.closest(visibleFindBlockSelector) || root;
+    const owner = textNode.parentElement?.closest('[data-nodeid]');
+    const nodeId = includeNodeIds
+      ? Number(owner?.getAttribute('data-nodeid'))
+      : null;
 
     if (value && text && block !== previousBlock) {
       text += '\n';
-      spans.push({ node: null, beforeNode: previousTextNode, afterNode: textNode });
+      spans.push({
+        node: null,
+        beforeNode: previousTextNode,
+        afterNode: textNode,
+        nodeId: null,
+        separator: true,
+        replaceable: false
+      });
     }
 
     for (let index = 0; index < value.length; index += 1) {
       text += value[index];
-      spans.push({ node: textNode, from: index, to: index + 1 });
+      spans.push({
+        node: textNode,
+        from: textNodeOffset + index,
+        to: textNodeOffset + index + 1,
+        nodeId: Number.isFinite(nodeId) ? nodeId : null,
+        separator: false,
+        replaceable: false
+      });
     }
 
     if (value) {
       previousBlock = block;
       previousTextNode = textNode;
     }
-    textNode = walker.nextNode();
+    currentNode = walker.nextNode();
   }
 
   return { text, spans };
@@ -1702,8 +1787,8 @@ function clearVisibleFindSelection(root) {
   }
 }
 
-function selectVisibleFindMatch(root, query, activeIndex) {
-  const snapshot = createVisibleFindSnapshot(root);
+function selectVisibleFindMatch(root, query, activeIndex, options) {
+  const snapshot = createVisibleFindSnapshot(root, options);
   const matches = findTextMatches(snapshot.text, query);
 
   if (!matches.length) {
@@ -1743,7 +1828,13 @@ function selectVisibleFindMatch(root, query, activeIndex) {
 function renderFindReplaceState() {
   const { matches, activeIndex } = findReplaceState;
   const hasMatches = matches.length > 0;
-  const canReplace = hasMatches && findReplaceState.snapshot?.kind !== 'reader-readonly';
+  const snapshot = findReplaceState.snapshot;
+  const isWritable = snapshot?.kind !== 'reader-readonly';
+  const isMappedMatchWritable = (match) => (
+    !snapshot?.spans || Boolean(mappedTextRange(snapshot.spans, match.from, match.to))
+  );
+  const canReplace = hasMatches && isWritable && isMappedMatchWritable(matches[activeIndex]);
+  const canReplaceAll = hasMatches && isWritable && matches.some(isMappedMatchWritable);
 
   findReplaceElements.matchCount.value = hasMatches
     ? `${activeIndex + 1} / ${matches.length}`
@@ -1751,7 +1842,7 @@ function renderFindReplaceState() {
   findReplaceElements.previousButton.disabled = !hasMatches;
   findReplaceElements.nextButton.disabled = !hasMatches;
   findReplaceElements.replaceButton.disabled = !canReplace;
-  findReplaceElements.replaceAllButton.disabled = !canReplace;
+  findReplaceElements.replaceAllButton.disabled = !canReplaceAll;
 }
 
 function selectFindMatch() {
@@ -1760,7 +1851,7 @@ function selectFindMatch() {
 
   renderFindReplaceState();
   if (!match) {
-    if (snapshot?.kind === 'reader' || snapshot?.kind === 'reader-readonly') {
+    if (snapshot?.kind?.startsWith('reader')) {
       clearVisibleFindSelection(viewerElement);
     }
     return;
@@ -1786,9 +1877,34 @@ function selectFindMatch() {
   if (
     snapshot.kind === 'reader' ||
     snapshot.kind === 'reader-readonly' ||
+    snapshot.kind === 'reader-source' ||
     snapshot.kind === 'wysiwyg-raw' ||
     snapshot.kind === 'wysiwyg-source'
   ) {
+    if (snapshot.kind === 'reader') {
+      const nodeId = mappedTextNodeId(snapshot.spans, match.from, match.to);
+      const anchors = nodeId === null || nodeId === undefined
+        ? []
+        : viewerElement.querySelectorAll(`[data-nodeid="${nodeId}"]`);
+      const anchor = anchors.length === 1 ? anchors[0] : null;
+
+      if (anchor) {
+        const anchorMatchIndex = findReplaceState.matches
+          .slice(0, findReplaceState.activeIndex)
+          .filter((candidate) => (
+            mappedTextNodeId(snapshot.spans, candidate.from, candidate.to) === nodeId
+          ))
+          .length;
+        selectVisibleFindMatch(
+          anchor,
+          findReplaceElements.findInput.value,
+          anchorMatchIndex,
+          { directNodeText: true }
+        );
+        return;
+      }
+    }
+
     selectVisibleFindMatch(
       snapshot.kind.startsWith('reader')
         ? viewerElement
@@ -1816,7 +1932,7 @@ function refreshFindMatches({
   findReplaceState.snapshot = snapshot;
   findReplaceState.mode = state.mode;
   const matches = findTextMatches(snapshot.text, query);
-  findReplaceState.matches = snapshot.spans
+  findReplaceState.matches = snapshot.kind === 'wysiwyg' && snapshot.spans
     ? matches.filter((match) => (
       snapshot.spans
         .slice(match.from, match.to)
@@ -1905,9 +2021,17 @@ function replaceMappedWysiwygRange(snapshot, from, to, replacement) {
   return true;
 }
 
-function commitReaderWysiwygModel() {
-  const nextText = editor.convertor.toMarkdownText(editor.wwEditor.getModel());
-  editor.setMarkdown(nextText, false);
+function commitReaderMarkdown(nextText) {
+  const releaseSuppression = beginSuppressChanges();
+
+  try {
+    editor.setMarkdown(nextText, false);
+  } finally {
+    releaseSuppression();
+  }
+
+  noteDocumentChanged();
+  refreshReader();
 }
 
 function replaceFindRange(from, to, replacement) {
@@ -1922,24 +2046,19 @@ function replaceFindRange(from, to, replacement) {
   }
 
   if (snapshot.kind === 'reader') {
-    const releaseSuppression = beginSuppressChanges();
-    let changed = false;
-
-    try {
-      changed = replaceMappedWysiwygRange(snapshot, from, to, replacement);
-      if (changed) {
-        commitReaderWysiwygModel();
-      }
-    } finally {
-      releaseSuppression();
+    if (snapshot.text.slice(from, to) === replacement) {
+      return false;
     }
 
-    if (changed) {
-      noteDocumentChanged();
-      refreshReader();
+    const range = mappedTextRange(snapshot.spans, from, to);
+    if (!range) {
+      return false;
     }
 
-    return changed;
+    const markdown = getCurrentMarkdown();
+    const nextText = `${markdown.slice(0, range[0])}${replacement}${markdown.slice(range[1])}`;
+    commitReaderMarkdown(nextText);
+    return true;
   }
 
   const text = getCurrentMarkdown();
@@ -1968,6 +2087,10 @@ function replaceFindRange(from, to, replacement) {
       releaseSuppression();
     }
     noteDocumentChanged();
+
+    if (snapshot.kind === 'reader-source') {
+      refreshReader();
+    }
   }
 
   return true;
@@ -2003,39 +2126,55 @@ function replaceAllFindMatches() {
   const replacementInput = findReplaceElements.replaceInput.value;
   const replacement = decodeFindReplaceEscapes(replacementInput);
 
-  if (
-    findReplaceState.snapshot?.kind === 'wysiwyg' ||
-    findReplaceState.snapshot?.kind === 'reader'
-  ) {
-    const isReader = findReplaceState.snapshot.kind === 'reader';
-    const releaseSuppression = isReader ? beginSuppressChanges() : null;
+  if (findReplaceState.snapshot?.kind === 'reader') {
+    let nextText = getCurrentMarkdown();
     let replacementCount = 0;
 
-    try {
-      [...matches].reverse().forEach((match) => {
-        if (
-          replaceMappedWysiwygRange(
-            findReplaceState.snapshot,
-            match.from,
-            match.to,
-            replacement
-          )
-        ) {
-          replacementCount += 1;
-        }
-      });
-
-      if (isReader && replacementCount) {
-        commitReaderWysiwygModel();
+    [...matches].reverse().forEach((match) => {
+      if (text.slice(match.from, match.to) === replacement) {
+        return;
       }
-    } finally {
-      releaseSuppression?.();
+
+      const range = mappedTextRange(
+        findReplaceState.snapshot.spans,
+        match.from,
+        match.to
+      );
+
+      if (range) {
+        nextText = `${nextText.slice(0, range[0])}${replacement}${nextText.slice(range[1])}`;
+        replacementCount += 1;
+      }
+    });
+
+    if (replacementCount) {
+      commitReaderMarkdown(nextText);
     }
 
-    if (isReader && replacementCount) {
-      noteDocumentChanged();
-      refreshReader();
+    findReplaceState.anchorOffset = 0;
+    refreshFindMatches({ anchorOffset: 0 });
+
+    if (replacementCount) {
+      setStatus(`已替换 ${replacementCount} 处`);
     }
+    return;
+  }
+
+  if (findReplaceState.snapshot?.kind === 'wysiwyg') {
+    let replacementCount = 0;
+
+    [...matches].reverse().forEach((match) => {
+      if (
+        replaceMappedWysiwygRange(
+          findReplaceState.snapshot,
+          match.from,
+          match.to,
+          replacement
+        )
+      ) {
+        replacementCount += 1;
+      }
+    });
 
     findReplaceState.anchorOffset = 0;
     refreshFindMatches({ anchorOffset: 0 });

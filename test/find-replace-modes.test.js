@@ -20,7 +20,7 @@ test('opening and closing find and replace never changes the current mode', () =
 
 test('WYSIWYG search indexes visible ProseMirror text and preserves inline marks', () => {
   const snapshotSource = functionSource('createWysiwygFindSnapshot', 'createReaderFindSnapshot');
-  const replaceSource = functionSource('replaceMappedWysiwygRange', 'commitReaderWysiwygModel');
+  const replaceSource = functionSource('replaceMappedWysiwygRange', 'commitReaderMarkdown');
 
   assert.match(snapshotSource, /editor\.wwEditor\?\.view\?\.state\?\.doc/);
   assert.match(snapshotSource, /node\.isTextblock/);
@@ -43,24 +43,28 @@ test('newline queries use exact Markdown offsets without leaving WYSIWYG mode', 
   assert.match(rangeSource, /editor\.setMarkdown\(nextText, false\)/);
 });
 
-test('reader search builds a visible-text model and commits replacements in place', () => {
+test('reader search uses visible DOM text and maps only safe raw source ranges', () => {
   const snapshotSource = functionSource('createReaderFindSnapshot', 'getFindSearchSnapshot');
-  const commitSource = functionSource('commitReaderWysiwygModel', 'replaceFindRange');
+  const commitSource = functionSource('commitReaderMarkdown', 'replaceFindRange');
   const singleSource = functionSource('replaceCurrentFindMatch', 'replaceAllFindMatches');
   const rangeSource = functionSource('replaceFindRange', 'replaceCurrentFindMatch');
   const replaceAllSource = functionSource('replaceAllFindMatches', 'openFindReplace');
 
-  assert.match(snapshotSource, /toWysiwygModel/);
+  assert.match(snapshotSource, /viewer\?\.toastMark\?\.getRootNode/);
+  assert.match(snapshotSource, /createVisibleFindSnapshot/);
+  assert.match(snapshotSource, /buildMarkdownAstFindSnapshot/);
+  assert.match(snapshotSource, /mapVisibleFindSnapshotToSource/);
   assert.match(snapshotSource, /kind: 'reader'/);
   assert.match(snapshotSource, /kind: 'reader-readonly'/);
-  assert.match(commitSource, /toMarkdownText\(editor\.wwEditor\.getModel\(\)\)/);
   assert.match(commitSource, /editor\.setMarkdown\(nextText, false\)/);
+  assert.doesNotMatch(snapshotSource + commitSource, /toWysiwygModel|toMarkdownText/);
   assert.match(singleSource, /decodeFindReplaceEscapes/);
   assert.match(singleSource, /match\.from \+ replacement\.length/);
-  assert.match(rangeSource, /snapshot\.kind === 'reader'[\s\S]*?replaceMappedWysiwygRange/);
-  assert.match(rangeSource, /noteDocumentChanged\(\)[\s\S]*?refreshReader\(\)/);
-  assert.match(replaceAllSource, /isReader[\s\S]*?commitReaderWysiwygModel/);
-  assert.match(replaceAllSource, /isReader[\s\S]*?refreshReader\(\)/);
+  assert.match(rangeSource, /snapshot\.kind === 'reader'[\s\S]*?mappedTextRange/);
+  assert.match(rangeSource, /markdown\.slice\(0, range\[0\]\)/);
+  assert.match(commitSource, /noteDocumentChanged\(\)[\s\S]*?refreshReader\(\)/);
+  assert.match(replaceAllSource, /snapshot\?\.kind === 'reader'[\s\S]*?mappedTextRange/);
+  assert.match(replaceAllSource, /commitReaderMarkdown\(nextText\)/);
 });
 
 test('large documents keep their shared CodeMirror document for every mode', () => {
