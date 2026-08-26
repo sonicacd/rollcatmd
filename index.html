@@ -77,6 +77,23 @@
       </header>
 
       <div class="workspace">
+        <form class="find-replace-panel" id="findReplacePanel" role="search" aria-label="查找和替换" hidden>
+          <div class="find-replace-row">
+            <label for="findInput">查找</label>
+            <input id="findInput" type="text" autocomplete="off" spellcheck="false" aria-keyshortcuts="Control+F Meta+F">
+            <output id="findMatchCount" for="findInput" aria-live="polite">0 / 0</output>
+            <button id="findPreviousButton" type="button" title="上一个（Shift+Enter）" aria-label="上一个匹配项">↑</button>
+            <button id="findNextButton" type="submit" title="下一个（Enter）" aria-label="下一个匹配项">↓</button>
+            <button id="closeFindButton" type="button" title="关闭（Esc）" aria-label="关闭查找和替换">×</button>
+          </div>
+          <div class="find-replace-row">
+            <label for="replaceInput">替换</label>
+            <input id="replaceInput" type="text" autocomplete="off" spellcheck="false">
+            <button id="replaceButton" type="button">替换</button>
+            <button id="replaceAllButton" type="button">全部替换</button>
+          </div>
+        </form>
+
         <section class="editor-panel" id="editorPanel" aria-label="Markdown 编辑器">
           <div id="editor" aria-hidden="false"></div>
           <div class="large-file-panel hidden" id="largeFilePanel" aria-hidden="true">

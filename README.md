@@ -34,7 +34,7 @@ Android 版使用系统文件选择器，不申请整盘存储权限。从系统
 
 ### 快速上手
 
-1. 点击“新建”创建文档，或点击“打开”选择已有文件。
+1. 点击“新建”创建文档，点击“打开”选择已有文件，或把支持的文件直接拖进窗口。
 2. 在“所见即所得”“源码”“阅读”三种视图之间切换。
 3. 编辑完成后点击“保存”；需要保留原文件时使用“另存为”。
 4. 从“主题”菜单选择纯黑、纯白或护眼主题。
@@ -107,7 +107,7 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 - `.mkd`
 - `.txt`
 
-单文件版不会自动注册文件关联。可以从软件内点击“打开”选择文档；如果希望双击 Markdown 时启动滚猫md，可在 Windows“打开方式”中浏览并选择 `rollcat-md.exe`。
+Windows 版也可以把支持的文件直接拖进程序窗口打开。单文件版不会自动注册文件关联；如果希望双击 Markdown 时启动滚猫md，可在 Windows“打开方式”中浏览并选择 `rollcat-md.exe`。
 
 文件必须是有效的 **UTF-8** 文本，可以带或不带 UTF-8 BOM。为了避免乱码后覆盖原文件，GBK、UTF-16 等其他编码会被拒绝打开，请先使用其他工具转换为 UTF-8。
 
@@ -122,7 +122,7 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 | 所见即所得 | `Ctrl+1` |
 | 源码 | `Ctrl+2` |
 | 阅读 | `Ctrl+3` |
-| 查找（源码及分块渲染视图） | `Ctrl+F` |
+| 查找和替换 | `Ctrl+F` |
 
 ### 保存与数据安全
 
@@ -195,7 +195,7 @@ Local builds require Android SDK 36, the NDK, a JDK, and the Rust Android target
 
 ### Quick Start
 
-1. Select **New** to create a document, or **Open** to choose an existing file.
+1. Select **New** to create a document, choose **Open**, or drag a supported file directly onto the Windows app.
 2. Switch between **WYSIWYG**, **Source**, and **Reader** views.
 3. Select **Save** after editing, or **Save As** to keep the original file unchanged.
 4. Choose Black, White, or Eye Comfort from the Theme menu.
@@ -268,7 +268,7 @@ The application can open and save:
 - `.mkd`
 - `.txt`
 
-The standalone EXE does not register file associations automatically. Open documents from inside the app, or use Windows **Open with** to select `rollcat-md.exe` as the default Markdown application.
+The Windows app also opens supported files dropped directly onto its window. The standalone EXE does not register file associations automatically; use Windows **Open with** to select `rollcat-md.exe` as the default Markdown application if desired.
 
 Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-16, and other encodings are rejected to prevent corrupted text from overwriting the original file. Convert them to UTF-8 before opening.
 
@@ -283,7 +283,7 @@ Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-1
 | WYSIWYG view | `Ctrl+1` |
 | Source view | `Ctrl+2` |
 | Reader view | `Ctrl+3` |
-| Find in Source or viewport-rendered view | `Ctrl+F` |
+| Find and replace | `Ctrl+F` |
 
 ### Saving and Data Safety
 

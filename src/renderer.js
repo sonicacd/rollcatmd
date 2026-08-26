@@ -7,7 +7,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState } from '@codemirror/state';
-import { search, searchKeymap } from '@codemirror/search';
+import { search } from '@codemirror/search';
 import {
   drawSelection,
   EditorView,
@@ -28,6 +28,7 @@ import {
 } from './document-size.js';
 import {
   decodeUtf8Document,
+  markdownPositionToOffset,
   normalizeEditorText,
   serializeTextDocument,
   utf8ByteLength,
@@ -55,6 +56,13 @@ import {
   isMobileChromeCollapsed,
   reduceMobileChrome
 } from './mobile-chrome.js';
+import {
+  findMatchIndex,
+  findTextMatches,
+  offsetToMarkdownPosition,
+  replaceAllText
+} from './find-replace.js';
+import { registerNativeFileDrop } from './file-drop.js';
 import './styles.css';
 
 const initialTheme = applyTheme(readStoredTheme(), { persist: false });
@@ -125,6 +133,18 @@ const themeSelect = document.querySelector('#themeSelect');
 const themeControl = themeSelect.closest('.theme-control');
 const mobileLayoutQuery = window.matchMedia('(max-width: 820px)');
 themeSelect.value = initialTheme;
+
+const findReplaceElements = {
+  panel: document.querySelector('#findReplacePanel'),
+  findInput: document.querySelector('#findInput'),
+  replaceInput: document.querySelector('#replaceInput'),
+  matchCount: document.querySelector('#findMatchCount'),
+  previousButton: document.querySelector('#findPreviousButton'),
+  nextButton: document.querySelector('#findNextButton'),
+  replaceButton: document.querySelector('#replaceButton'),
+  replaceAllButton: document.querySelector('#replaceAllButton'),
+  closeButton: document.querySelector('#closeFindButton')
+};
 
 const markdownFilters = [
   { name: 'Markdown 文件', extensions: ['md', 'markdown', 'mdown', 'mkd'] },
@@ -204,6 +224,15 @@ const state = {
   }
 };
 
+const findReplaceState = {
+  query: '',
+  matches: [],
+  activeIndex: -1,
+  anchorOffset: 0,
+  documentRevision: -1,
+  returnMode: null
+};
+
 function sanitizeMarkdownHTML(content) {
   return DOMPurify.sanitize(content, {
     USE_PROFILES: { html: true },
@@ -280,7 +309,7 @@ const largeFileEditorExtensions = [
   history(),
   drawSelection(),
   search({ top: true }),
-  keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+  keymap.of([...defaultKeymap, ...historyKeymap]),
   markdown({
     base: markdownLanguage,
     addKeymap: false,
@@ -921,6 +950,58 @@ async function initializeNativeFileOpenHandling() {
   await openInitialLaunchFile();
 }
 
+async function openDroppedFile(filePath) {
+  if (!confirmDiscardChanges()) {
+    setStatus('已取消打开拖入文件');
+    return false;
+  }
+
+  const request = beginOpenRequest();
+
+  try {
+    setStatus('正在读取拖入文件…');
+    const bytes = await readFile(filePath);
+
+    if (!canApplyOpenRequest(request)) {
+      return false;
+    }
+
+    openDocument({
+      filePath,
+      ...decodeOpenedDocument(bytes),
+      byteSize: bytes.byteLength
+    });
+    return true;
+  } catch (error) {
+    if (!canApplyOpenRequest(request)) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+async function initializeNativeFileDrop() {
+  if (!isTauriRuntime()) {
+    return;
+  }
+
+  try {
+    await registerNativeFileDrop(getCurrentWindow(), {
+      onFileDrop: openDroppedFile,
+      onUnsupportedDrop: () => {
+        setStatus('仅支持 Markdown 或文本文件');
+      },
+      onError: (error) => {
+        setStatus('拖入文件打开失败');
+        window.alert(`打开拖入文件失败：${error.message || error}`);
+      }
+    });
+  } catch (error) {
+    console.warn('初始化文件拖放处理失败', error);
+  }
+}
+
 let statusHideTimer = null;
 
 function setStatus(message) {
@@ -1193,6 +1274,7 @@ function setDocument(
     originalSerializedContent = null
   } = {}
 ) {
+  closeFindReplace({ restoreMode: false, restoreFocus: false });
   const content = normalizeEditorText(markdown || '');
   const measuredSize = Number.isFinite(byteSize) ? byteSize : utf8ByteLength(content);
   const isLargeDocument = shouldUseLargeDocumentMode(measuredSize, content.length);
@@ -1413,6 +1495,233 @@ function saveFile(saveAs = false) {
   return enqueueSaveTask(saveAs);
 }
 
+function isFindReplaceOpen() {
+  return !findReplaceElements.panel.hidden;
+}
+
+function getFindCursorOffset(text = getCurrentMarkdown()) {
+  if (state.isLargeDocument) {
+    return largeFileEditor.state.selection.main.head;
+  }
+
+  const selection = editor.getSelection();
+  const cursor = Array.isArray(selection?.[1]) ? selection[1] : selection?.[0];
+  return markdownPositionToOffset(text, cursor);
+}
+
+function getSelectedFindText() {
+  if (state.mode === 'reader') {
+    return '';
+  }
+
+  if (state.isLargeDocument) {
+    const selection = largeFileEditor.state.selection.main;
+    return largeFileEditor.state.doc.sliceString(selection.from, selection.to);
+  }
+
+  return editor.getSelectedText();
+}
+
+function renderFindReplaceState() {
+  const { matches, activeIndex } = findReplaceState;
+  const hasMatches = matches.length > 0;
+
+  findReplaceElements.matchCount.value = hasMatches
+    ? `${activeIndex + 1} / ${matches.length}`
+    : '0 / 0';
+  findReplaceElements.previousButton.disabled = !hasMatches;
+  findReplaceElements.nextButton.disabled = !hasMatches;
+  findReplaceElements.replaceButton.disabled = !hasMatches;
+  findReplaceElements.replaceAllButton.disabled = !hasMatches;
+}
+
+function selectFindMatch() {
+  const match = findReplaceState.matches[findReplaceState.activeIndex];
+
+  renderFindReplaceState();
+  if (!match) {
+    return;
+  }
+
+  const text = getCurrentMarkdown();
+  if (state.isLargeDocument) {
+    largeFileEditor.dispatch({
+      selection: { anchor: match.from, head: match.to },
+      scrollIntoView: true
+    });
+    return;
+  }
+
+  editor.setSelection(
+    offsetToMarkdownPosition(text, match.from),
+    offsetToMarkdownPosition(text, match.to)
+  );
+}
+
+function refreshFindMatches({ anchorOffset = findReplaceState.anchorOffset, direction = 1 } = {}) {
+  const text = getCurrentMarkdown();
+  const query = findReplaceElements.findInput.value;
+
+  findReplaceState.query = query;
+  findReplaceState.matches = findTextMatches(text, query);
+  findReplaceState.activeIndex = findMatchIndex(
+    findReplaceState.matches,
+    anchorOffset,
+    direction
+  );
+  findReplaceState.documentRevision = state.revision;
+  selectFindMatch();
+}
+
+function ensureCurrentFindMatches() {
+  const query = findReplaceElements.findInput.value;
+
+  if (
+    query !== findReplaceState.query ||
+    findReplaceState.documentRevision !== state.revision
+  ) {
+    findReplaceState.anchorOffset = getFindCursorOffset();
+    refreshFindMatches();
+  }
+}
+
+function moveFindMatch(direction) {
+  ensureCurrentFindMatches();
+  const matchCount = findReplaceState.matches.length;
+
+  if (!matchCount) {
+    return;
+  }
+
+  findReplaceState.activeIndex =
+    (findReplaceState.activeIndex + direction + matchCount) % matchCount;
+  selectFindMatch();
+}
+
+function replaceFindRange(from, to, replacement) {
+  const text = getCurrentMarkdown();
+
+  if (text.slice(from, to) === replacement) {
+    return false;
+  }
+
+  if (state.isLargeDocument) {
+    largeFileEditor.dispatch({
+      changes: { from, to, insert: replacement },
+      selection: { anchor: from + replacement.length }
+    });
+  } else {
+    editor.replaceSelection(
+      replacement,
+      offsetToMarkdownPosition(text, from),
+      offsetToMarkdownPosition(text, to)
+    );
+  }
+
+  return true;
+}
+
+function replaceCurrentFindMatch() {
+  ensureCurrentFindMatches();
+  const match = findReplaceState.matches[findReplaceState.activeIndex];
+
+  if (!match) {
+    return;
+  }
+
+  const replacement = findReplaceElements.replaceInput.value;
+  const changed = replaceFindRange(match.from, match.to, replacement);
+  findReplaceState.anchorOffset = match.from + replacement.length;
+  refreshFindMatches({ anchorOffset: findReplaceState.anchorOffset });
+
+  if (changed) {
+    setStatus('已替换 1 处');
+  }
+}
+
+function replaceAllFindMatches() {
+  ensureCurrentFindMatches();
+  const text = getCurrentMarkdown();
+  const matches = findReplaceState.matches;
+
+  if (!matches.length) {
+    return;
+  }
+
+  const replacement = findReplaceElements.replaceInput.value;
+  const replacedText = replaceAllText(text, matches, replacement);
+  const changed = replaceFindRange(0, text.length, replacedText);
+  findReplaceState.anchorOffset = 0;
+  refreshFindMatches({ anchorOffset: 0 });
+
+  if (changed) {
+    setStatus(`已替换 ${matches.length} 处`);
+  }
+}
+
+function openFindReplace() {
+  const wasOpen = isFindReplaceOpen();
+  let selectedText = '';
+
+  if (!wasOpen) {
+    findReplaceState.returnMode = state.mode;
+    selectedText = getSelectedFindText();
+    findReplaceElements.panel.hidden = false;
+  }
+
+  if (state.mode !== 'markdown') {
+    setMode('markdown');
+  }
+
+  if (!wasOpen) {
+    findReplaceState.anchorOffset = getFindCursorOffset();
+    if (selectedText && selectedText.length <= 200 && !/[\r\n]/.test(selectedText)) {
+      findReplaceElements.findInput.value = selectedText;
+    }
+    refreshFindMatches();
+  }
+
+  window.requestAnimationFrame(() => {
+    findReplaceElements.findInput.focus({ preventScroll: true });
+    findReplaceElements.findInput.select();
+  });
+}
+
+function closeFindReplace({ restoreMode = true, restoreFocus = true } = {}) {
+  if (!isFindReplaceOpen()) {
+    return;
+  }
+
+  findReplaceElements.panel.hidden = true;
+  const returnMode = findReplaceState.returnMode;
+  findReplaceState.returnMode = null;
+  findReplaceState.matches = [];
+  findReplaceState.activeIndex = -1;
+  renderFindReplaceState();
+
+  if (
+    restoreMode &&
+    returnMode &&
+    returnMode !== 'markdown' &&
+    state.mode === 'markdown'
+  ) {
+    setMode(returnMode);
+  } else if (restoreFocus) {
+    if (state.isLargeDocument) {
+      largeFileEditor.focus();
+    } else if (state.mode === 'reader') {
+      readerPanel.focus({ preventScroll: true });
+    } else {
+      editor.focus();
+    }
+  }
+}
+
+function changeModeFromControl(mode) {
+  closeFindReplace({ restoreMode: false, restoreFocus: false });
+  setMode(mode);
+}
+
 function setMode(mode) {
   state.mode = mode;
   markMobileReaderScrollProgrammatic();
@@ -1451,9 +1760,10 @@ function runAction(action) {
     open: openFile,
     save: () => saveFile(false),
     'save-as': () => saveFile(true),
-    wysiwyg: () => setMode('wysiwyg'),
-    markdown: () => setMode('markdown'),
-    reader: () => setMode('reader')
+    find: openFindReplace,
+    wysiwyg: () => changeModeFromControl('wysiwyg'),
+    markdown: () => changeModeFromControl('markdown'),
+    reader: () => changeModeFromControl('reader')
   };
 
   actions[action]?.();
@@ -1471,9 +1781,46 @@ controls.newButton.addEventListener('click', newFile);
 controls.openButton.addEventListener('click', openFile);
 controls.saveButton.addEventListener('click', () => saveFile(false));
 controls.saveAsButton.addEventListener('click', () => saveFile(true));
-controls.wysiwygMode.addEventListener('click', () => setMode('wysiwyg'));
-controls.markdownMode.addEventListener('click', () => setMode('markdown'));
-controls.readerMode.addEventListener('click', () => setMode('reader'));
+controls.wysiwygMode.addEventListener('click', () => changeModeFromControl('wysiwyg'));
+controls.markdownMode.addEventListener('click', () => changeModeFromControl('markdown'));
+controls.readerMode.addEventListener('click', () => changeModeFromControl('reader'));
+findReplaceElements.panel.addEventListener('submit', (event) => {
+  event.preventDefault();
+  moveFindMatch(1);
+});
+findReplaceElements.panel.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeFindReplace();
+  } else if (
+    event.key === 'Enter' &&
+    !event.isComposing &&
+    (
+      event.target === findReplaceElements.findInput ||
+      event.target === findReplaceElements.replaceInput
+    )
+  ) {
+    event.preventDefault();
+    moveFindMatch(event.shiftKey ? -1 : 1);
+  }
+});
+findReplaceElements.findInput.addEventListener('input', () => {
+  refreshFindMatches();
+});
+findReplaceElements.previousButton.addEventListener('click', () => moveFindMatch(-1));
+findReplaceElements.replaceButton.addEventListener('click', () => {
+  replaceCurrentFindMatch();
+  window.requestAnimationFrame(() => {
+    findReplaceElements.replaceButton.focus({ preventScroll: true });
+  });
+});
+findReplaceElements.replaceAllButton.addEventListener('click', () => {
+  replaceAllFindMatches();
+  window.requestAnimationFrame(() => {
+    findReplaceElements.replaceAllButton.focus({ preventScroll: true });
+  });
+});
+findReplaceElements.closeButton.addEventListener('click', () => closeFindReplace());
 mobileChromeToggle.addEventListener('click', () => {
   dispatchMobileChrome({ type: 'toggle' });
 });
@@ -1490,6 +1837,12 @@ themeSelect.addEventListener('change', () => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && isFindReplaceOpen()) {
+    event.preventDefault();
+    closeFindReplace();
+    return;
+  }
+
   const isMod = event.ctrlKey || event.metaKey;
 
   if (!isMod) {
@@ -1501,6 +1854,7 @@ document.addEventListener('keydown', (event) => {
     n: 'new',
     o: 'open',
     s: event.shiftKey ? 'save-as' : 'save',
+    f: 'find',
     '1': 'wysiwyg',
     '2': 'markdown',
     '3': 'reader'
@@ -1535,4 +1889,6 @@ updateModeButtons();
 renderMobileChrome();
 updateSavingState();
 updateCounts();
+renderFindReplaceState();
 void initializeNativeFileOpenHandling();
+void initializeNativeFileDrop();

@@ -424,10 +424,100 @@ html.android-runtime .mobile-document-meta {
 }
 
 .workspace {
+  position: relative;
   width: 100%;
   min-height: 0;
   padding: 10px 18px 16px;
   overflow: hidden;
+}
+
+.find-replace-panel {
+  position: absolute;
+  z-index: 70;
+  top: 18px;
+  right: 26px;
+  display: grid;
+  width: min(620px, calc(100% - 52px));
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  color: var(--text);
+}
+
+.find-replace-panel[hidden] {
+  display: none;
+}
+
+.find-replace-row {
+  display: grid;
+  grid-template-columns: 48px minmax(120px, 1fr) auto auto auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.find-replace-row:last-child {
+  grid-template-columns: 48px minmax(120px, 1fr) auto auto;
+}
+
+.find-replace-row label {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.find-replace-row input {
+  min-width: 0;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  outline: none;
+  background: var(--surface-deep);
+  color: var(--text);
+  font: inherit;
+}
+
+.find-replace-row input:focus {
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 2px var(--active-bg);
+}
+
+.find-replace-row output {
+  min-width: 46px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.find-replace-row button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--button-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.find-replace-row button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--button-hover-bg);
+  color: var(--text-strong);
+}
+
+.find-replace-row button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.find-replace-row button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .editor-panel,
@@ -1283,6 +1373,50 @@ html.android-runtime .mobile-document-meta {
 
   .workspace {
     padding: 6px;
+  }
+
+  .find-replace-panel {
+    top: 12px;
+    right: 12px;
+    width: calc(100% - 24px);
+  }
+
+  .find-replace-row,
+  .find-replace-row:last-child {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .find-replace-row label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+  }
+
+  .find-replace-row output {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .find-replace-row:first-child button:nth-of-type(1) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .find-replace-row:first-child button:nth-of-type(2) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .find-replace-row:first-child button:nth-of-type(3) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .find-replace-row:last-child input {
+    grid-column: 1 / -1;
   }
 
   .toastui-editor-ww-container .ProseMirror,
