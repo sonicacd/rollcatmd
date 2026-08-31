@@ -9,6 +9,19 @@
     "dialog:allow-open",
     "dialog:allow-save",
     "fs:allow-read-file",
-    "fs:allow-write-file"
+    "fs:allow-write-file",
+    "fs:allow-create",
+    "fs:allow-open",
+    "fs:allow-read",
+    "fs:allow-remove",
+    "fs:allow-write",
+    {
+      "identifier": "fs:scope",
+      "allow": [{ "path": "$APPCACHE/image-export-*.zip" }]
+    },
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://*" }]
+    }
   ]
 }

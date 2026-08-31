@@ -681,12 +681,179 @@ html.android-runtime .mobile-document-meta {
   outline-offset: 2px;
 }
 
+.image-export-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font: inherit;
+}
+
+.image-export-dialog:not([open]) {
+  display: none;
+}
+
+.image-export-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.image-export-dialog-frame {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.image-export-dialog-header {
+  padding: 15px 17px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+
+.image-export-dialog-kicker {
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.image-export-dialog-header h2 {
+  margin: 2px 0 0;
+  color: var(--text-strong);
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+.image-export-dialog-content {
+  padding: 17px;
+}
+
+.image-export-dialog-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.image-export-dialog-panel[hidden] {
+  display: none;
+}
+
+.image-export-dialog-panel p {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.image-export-dialog-panel .image-export-dialog-note,
+.image-export-dialog-panel #imageExportDetail,
+.image-export-dialog-panel .image-export-stats {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.image-export-progress-heading {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.image-export-progress-heading strong {
+  color: var(--text-strong);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+#imageExportProgressValue {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+#imageExportProgress {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: var(--button-disabled-bg);
+  color: var(--teal);
+  accent-color: var(--teal);
+}
+
+#imageExportProgress::-webkit-progress-bar {
+  border-radius: inherit;
+  background: var(--button-disabled-bg);
+}
+
+#imageExportProgress::-webkit-progress-value {
+  border-radius: inherit;
+  background: var(--teal);
+}
+
+#imageExportProgress::-moz-progress-bar {
+  border-radius: inherit;
+  background: var(--teal);
+}
+
+.image-export-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 0 17px 17px;
+}
+
+.image-export-dialog-actions button {
+  min-width: 88px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--button-bg);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.image-export-dialog-actions button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.image-export-dialog-actions button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--button-hover-bg);
+  color: var(--text-strong);
+}
+
+.image-export-dialog-actions button.primary:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: white;
+}
+
+.image-export-dialog-actions button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.image-export-dialog-actions button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .image-export-stage {
   position: fixed;
   top: 0;
   left: -100000px;
   display: block;
-  width: 1200px;
+  width: 720px;
   height: auto;
   overflow: visible;
   border: 0;
@@ -696,18 +863,28 @@ html.android-runtime .mobile-document-meta {
 
 .image-export-viewport {
   position: relative;
-  width: 1200px;
+  width: 720px;
   overflow: hidden;
   background: var(--surface);
 }
 
 .image-export-content.toastui-editor-contents {
   box-sizing: border-box;
-  width: 1200px;
+  width: 720px;
   max-width: none;
   margin: 0;
-  padding: 56px 72px;
+  padding: 0 48px;
   transform-origin: top left;
+}
+
+.image-export-mount {
+  width: 720px;
+  transform-origin: top left;
+}
+
+.image-export-content.toastui-editor-contents img {
+  max-width: 100%;
+  height: auto;
 }
 
 .image-export-remote-image {
@@ -2241,6 +2418,24 @@ select {
   .go-to-line-close {
     width: 44px;
     height: 44px;
+  }
+
+  .image-export-dialog {
+    width: calc(100vw - 16px);
+    border-radius: 10px;
+  }
+
+  .image-export-dialog-header,
+  .image-export-dialog-content {
+    padding: 14px;
+  }
+
+  .image-export-dialog-actions {
+    padding: 0 14px calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .image-export-dialog-actions button {
+    flex: 1 1 0;
   }
 
   .help-dialog {

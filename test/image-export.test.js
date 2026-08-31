@@ -3,11 +3,14 @@ import test from 'node:test';
 
 import {
   buildImagePageFileName,
+  buildStreamingImagePageFileName,
   createImageExportPlan,
+  DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT,
   deriveMaxCanvasCssHeight,
   imageDataToUint8Array,
   iterateImageExportPages
 } from '../src/image-export.js';
+import { createImagePageCollector } from '../src/image-page-collector.js';
 
 test('keeps every page inside conservative canvas limits', () => {
   assert.equal(deriveMaxCanvasCssHeight(), 2048);
@@ -31,6 +34,9 @@ test('plans one PNG or stable numbered PNG pages', () => {
     'notes-003.png'
   ]);
   assert.ok(pages.every((page) => page.pixelWidth <= 4096 && page.pixelHeight <= 4096));
+  assert.equal(paged.pixelWidth, 1440);
+  assert.equal(DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT * paged.scale, 4072);
+  assert.equal(buildStreamingImagePageFileName('novel.md', 9), 'novel-0009.png');
 });
 
 test('sanitizes export names for the local filesystem', () => {
@@ -44,4 +50,19 @@ test('converts browser and native binary values to Uint8Array', async () => {
     await imageDataToUint8Array(new Uint16Array([258])),
     new Uint8Array(new Uint16Array([258]).buffer)
   );
+});
+
+test('honors cancellation while a ZIP is finishing', async () => {
+  const controller = new AbortController();
+  const collector = createImagePageCollector({
+    fileName: 'novel.md',
+    forceArchive: true,
+    signal: controller.signal
+  });
+  await collector.add(new Blob(['png']));
+
+  const finishing = collector.finish();
+  controller.abort();
+
+  await assert.rejects(finishing, { name: 'AbortError' });
 });

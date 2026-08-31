@@ -104,6 +104,7 @@ pub fn run() {
         .manage(OpenedUrls::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             get_initial_file,
             take_opened_urls,

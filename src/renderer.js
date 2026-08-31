@@ -71,11 +71,16 @@ import {
 } from './find-replace.js';
 import { registerNativeFileDrop } from './file-drop.js';
 import { countTextLines, parseLineNumber } from './go-to-line.js';
-import { imageDataToUint8Array } from './image-export.js';
+import { imageDataToUint8Array, imageExportBaseName } from './image-export.js';
 import {
   renderMarkdownAsImages,
-  renderSourceAsImages
+  renderMarkdownSourceAsImages
 } from './image-export-runtime.js';
+import { createImageExportDialog, getImageExportDialogElements } from './image-export-dialog.js';
+import { createNativeArchiveTemp } from './image-export-file.js';
+import { createImagePageCollector } from './image-page-collector.js';
+import { throwIfAborted } from './markdown-export-chunks.js';
+import { inlineRemoteImages } from './remote-image-export.js';
 import './styles.css';
 
 const initialTheme = applyTheme(readStoredTheme(), { persist: false });
@@ -900,22 +905,24 @@ function downloadBinaryFile(fileName, blob) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-async function saveImageExport(fileName, blob) {
+async function chooseImageExportPath(fileName) {
   const fileType = imageExportFileType(fileName);
+  return await saveDialog({
+    title: '保存图片',
+    defaultPath: fileName,
+    filters: [{ name: fileType.description, extensions: fileType.extensions }]
+  });
+}
 
+async function saveImageExport(fileName, blob, { onSaving } = {}) {
   if (isTauriRuntime()) {
-    const targetPath = await saveDialog({
-      title: '保存图片',
-      defaultPath: fileName,
-      filters: [{ name: fileType.description, extensions: fileType.extensions }]
-    });
-
+    const targetPath = await chooseImageExportPath(fileName);
     if (!targetPath) {
       return { canceled: true };
     }
-
+    onSaving?.();
     await writeFile(targetPath, await imageDataToUint8Array(blob));
-    return { canceled: false, filePath: targetPath };
+    return { canceled: false, filePath: targetPath, download: false };
   }
 
   downloadBinaryFile(fileName, blob);
@@ -923,32 +930,144 @@ async function saveImageExport(fileName, blob) {
 }
 
 let imageExportInProgress = false;
+let imageExportAbortController = null;
 
-async function exportCurrentDocumentAsImage() {
+async function renderImageExportChunk(markdown, mount) {
+  mount.replaceChildren();
+  const chunkViewer = Editor.factory({
+    el: mount,
+    viewer: true,
+    initialValue: markdown,
+    customHTMLSanitizer: sanitizeMarkdownHTML
+  });
+  enhanceRenderedMarkdown(mount);
+  const contents = mount.querySelector('.toastui-editor-contents');
+  return {
+    contents,
+    destroy() {
+      chunkViewer.destroy();
+      mount.replaceChildren();
+    }
+  };
+}
+
+function imageExportProgressStatus(event) {
+  if (event.phase === 'downloading-images') {
+    return `正在下载网络图片 ${event.completed || 0} / ${event.total || 0}…`;
+  }
+  if (event.phase === 'rendering') {
+    return `正在生成第 ${(event.pageCount || 0) + 1} 张图片…`;
+  }
+  if (event.phase === 'saving') {
+    return '正在保存图片…';
+  }
+  return '正在准备图片导出…';
+}
+
+const imageExportDialog = createImageExportDialog({
+  ...getImageExportDialogElements(document),
+  onStart: () => {
+    void startImageExport();
+  },
+  onCancel: ({ state: dialogState }) => {
+    if (dialogState === 'confirm') {
+      setStatus('已取消图片导出');
+      return;
+    }
+    if (imageExportAbortController && !imageExportAbortController.signal.aborted) {
+      imageExportAbortController.abort(new DOMException('已取消图片导出', 'AbortError'));
+    }
+  }
+});
+
+function openImageExportDialog() {
+  if (imageExportInProgress || imageExportDialog.state !== 'closed') {
+    return;
+  }
+  imageExportDialog.openConfirm({
+    description: '将按阅读排版导出；一页保存为 PNG，多页自动打包为 ZIP。',
+    note: '单张最长约两张竖版 A4。网络图片会按安全限制下载，开始后可以取消。'
+  });
+}
+
+async function startImageExport() {
   if (imageExportInProgress) {
     return;
   }
 
   imageExportInProgress = true;
+  const abortController = new AbortController();
+  imageExportAbortController = abortController;
   controls.exportImageButton.disabled = true;
   controls.exportImageButton.setAttribute('aria-busy', 'true');
   const fileName = getDisplayName(state.currentFilePath);
-  const reportProgress = (pageNumber, pageCount) => {
-    setStatus(`正在生成图片 ${pageNumber} / ${pageCount}…`);
+  let nativeArchive = null;
+  let archiveCollector = null;
+  let archiveFinished = false;
+  let archiveCommitted = false;
+  const reportProgress = (event) => {
+    imageExportDialog.updateProgress(event);
+    setStatus(imageExportProgressStatus(event));
   };
 
   try {
     let output;
     if (state.isLargeDocument) {
       const documentText = largeFileEditor.state.doc;
-      output = await renderSourceAsImages({
+      let targetPath = null;
+      if (isTauriRuntime()) {
+        const archiveName = `${imageExportBaseName(fileName)}-图片.zip`;
+        reportProgress({ phase: 'preparing', detail: '请选择分页图片压缩包的保存位置…' });
+        targetPath = await chooseImageExportPath(archiveName);
+        if (!targetPath) {
+          setStatus('已取消图片导出');
+          return;
+        }
+        throwIfAborted(abortController.signal);
+        nativeArchive = await createNativeArchiveTemp();
+        archiveCollector = createImagePageCollector({
+          fileName,
+          forceArchive: true,
+          signal: abortController.signal,
+          writeArchiveChunk: (chunk) => nativeArchive.write(chunk)
+        });
+      }
+
+      output = await renderMarkdownSourceAsImages({
         fileName,
         lineSource: {
           lineCount: documentText.lines,
-          getLine: (lineNumber) => documentText.line(lineNumber).text
+          getLine: (lineNumber) => documentText.line(lineNumber).text,
+          length: documentText.length
         },
-        onProgress: reportProgress
+        renderChunk: renderImageExportChunk,
+        inlineImages: inlineRemoteImages,
+        signal: abortController.signal,
+        onProgress: reportProgress,
+        onPage: archiveCollector ? (blob) => archiveCollector.add(blob) : undefined
       });
+
+      if (archiveCollector) {
+        const archiveOutput = await archiveCollector.finish();
+        throwIfAborted(abortController.signal);
+        archiveFinished = true;
+        await nativeArchive.finish();
+        throwIfAborted(abortController.signal);
+        imageExportAbortController = null;
+        imageExportDialog.setSaving('正在把分页图片写入所选文件…');
+        await nativeArchive.commit(targetPath, ({ completed, total }) => {
+          imageExportDialog.updateProgress({
+            phase: 'saving',
+            completed,
+            total,
+            pageCount: output.pageCount,
+            includedImages: output.includedImages,
+            failedImages: output.failedImages
+          });
+        });
+        archiveCommitted = true;
+        output = { ...output, ...archiveOutput, filePath: targetPath };
+      }
     } else {
       if (state.mode !== 'reader') {
         refreshReader();
@@ -957,35 +1076,118 @@ async function exportCurrentDocumentAsImage() {
       if (!contents) {
         throw new Error('没有可导出的 Markdown 内容');
       }
-      const markdownLines = getCurrentMarkdown().split('\n');
+      const markdown = getCurrentMarkdown();
+      const markdownLines = markdown.split('\n');
+      if (isTauriRuntime()) {
+        nativeArchive = await createNativeArchiveTemp();
+        archiveCollector = createImagePageCollector({
+          fileName,
+          signal: abortController.signal,
+          writeArchiveChunk: (chunk) => nativeArchive.write(chunk)
+        });
+      }
       output = await renderMarkdownAsImages({
         contents,
         fileName,
         lineSource: {
           lineCount: markdownLines.length,
-          getLine: (lineNumber) => markdownLines[lineNumber - 1] ?? ''
+          getLine: (lineNumber) => markdownLines[lineNumber - 1] ?? '',
+          length: markdown.length
         },
-        onProgress: reportProgress
+        renderChunk: renderImageExportChunk,
+        inlineImages: inlineRemoteImages,
+        signal: abortController.signal,
+        onProgress: reportProgress,
+        onPage: archiveCollector ? (blob) => archiveCollector.add(blob) : undefined
       });
+
+      if (archiveCollector) {
+        const archiveOutput = await archiveCollector.finish();
+        throwIfAborted(abortController.signal);
+        archiveFinished = true;
+        output = { ...output, ...archiveOutput };
+
+        if (archiveOutput.kind === 'zip') {
+          await nativeArchive.finish();
+          throwIfAborted(abortController.signal);
+          const targetPath = await chooseImageExportPath(archiveOutput.fileName);
+          if (!targetPath) {
+            setStatus('已取消图片导出');
+            return;
+          }
+          throwIfAborted(abortController.signal);
+          imageExportAbortController = null;
+          imageExportDialog.setSaving('正在把分页图片写入所选文件…');
+          await nativeArchive.commit(targetPath, ({ completed, total }) => {
+            imageExportDialog.updateProgress({
+              phase: 'saving',
+              completed,
+              total,
+              pageCount: output.pageCount,
+              includedImages: output.includedImages,
+              failedImages: output.failedImages
+            });
+          });
+          archiveCommitted = true;
+          output = { ...output, filePath: targetPath };
+        }
+      }
     }
 
-    const result = await saveImageExport(output.fileName, output.blob);
-    if (result.canceled) {
+    let result = { canceled: false, download: false };
+    if (!archiveCommitted) {
+      throwIfAborted(abortController.signal);
+      reportProgress({
+        phase: 'preparing',
+        detail: isTauriRuntime() ? '请选择图片保存位置…' : '正在准备浏览器下载…',
+        pageCount: output.pageCount,
+        includedImages: output.includedImages,
+        failedImages: output.failedImages
+      });
+      result = await saveImageExport(output.fileName, output.blob, {
+        onSaving: () => {
+          throwIfAborted(abortController.signal);
+          imageExportAbortController = null;
+          imageExportDialog.setSaving();
+        }
+      });
+      if (result.canceled) {
+        setStatus('已取消图片导出');
+        return;
+      }
+    }
+
+    const imageWarning = output.failedImages > 0
+      ? `，${output.failedImages.toLocaleString()} 张网络图片未包含`
+      : '';
+    const action = result.download ? '已请求下载' : '已导出';
+    setStatus(output.pageCount > 1
+      ? `${action} ${output.pageCount.toLocaleString()} 张分页图片${imageWarning}`
+      : `${action}图片${imageWarning}`);
+  } catch (error) {
+    if (error?.name === 'AbortError' || abortController.signal.aborted) {
       setStatus('已取消图片导出');
       return;
     }
-
-    setStatus(output.pageCount > 1
-      ? `已导出 ${output.pageCount.toLocaleString()} 张分页图片`
-      : '图片已导出');
-  } catch (error) {
     console.error('导出图片失败', error);
     setStatus('图片导出失败');
     window.alert(`导出图片失败：${error.message || error}`);
   } finally {
+    if (archiveCollector && !archiveFinished) {
+      archiveCollector.abort();
+    }
+    if (nativeArchive && !archiveCommitted) {
+      try {
+        await nativeArchive.discard();
+      } catch (error) {
+        console.warn('清理图片导出临时文件失败', error);
+      }
+    }
+    imageExportAbortController = null;
     imageExportInProgress = false;
     controls.exportImageButton.disabled = false;
     controls.exportImageButton.setAttribute('aria-busy', 'false');
+    imageExportDialog.close();
   }
 }
 
@@ -2561,7 +2763,7 @@ function runAction(action) {
     'save-as': () => saveFile(true),
     find: openFindReplace,
     'go-to-line': openGoToLine,
-    'export-image': exportCurrentDocumentAsImage,
+    'export-image': openImageExportDialog,
     wysiwyg: () => changeModeFromControl('wysiwyg'),
     markdown: () => changeModeFromControl('markdown'),
     reader: () => changeModeFromControl('reader')
@@ -2583,7 +2785,7 @@ controls.openButton.addEventListener('click', openFile);
 controls.saveButton.addEventListener('click', () => saveFile(false));
 controls.saveAsButton.addEventListener('click', () => saveFile(true));
 controls.goToLineButton.addEventListener('click', openGoToLine);
-controls.exportImageButton.addEventListener('click', exportCurrentDocumentAsImage);
+controls.exportImageButton.addEventListener('click', openImageExportDialog);
 controls.helpButton.addEventListener('click', openHelp);
 controls.wysiwygMode.addEventListener('click', () => changeModeFromControl('wysiwyg'));
 controls.markdownMode.addEventListener('click', () => changeModeFromControl('markdown'));
@@ -2689,7 +2891,7 @@ themeSelect.addEventListener('change', () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (helpElements.dialog.open || goToLineElements.dialog.open) {
+  if (helpElements.dialog.open || goToLineElements.dialog.open || imageExportDialog.state !== 'closed') {
     return;
   }
 

@@ -1,22 +1,24 @@
-import { Zip, ZipPassThrough } from 'fflate';
 import { toBlob as elementToBlob } from 'html-to-image';
+
 import {
+  DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT,
   DEFAULT_IMAGE_EXPORT_SCALE,
   DEFAULT_IMAGE_EXPORT_WIDTH,
-  createImageExportPlan,
-  deriveMaxCanvasCssHeight,
-  imageDataToUint8Array,
-  iterateImageExportPages
+  imageExportBaseName
 } from './image-export.js';
+import { createImagePageCollector } from './image-page-collector.js';
+import {
+  abortError,
+  inspectMarkdownForExport,
+  iterateMarkdownExportChunks,
+  throwIfAborted,
+  yieldToMainThread
+} from './markdown-export-chunks.js';
 
-const SOURCE_FONT_SIZE = 16;
-const SOURCE_LINE_HEIGHT = 24;
-const SOURCE_TOP = 72;
-const SOURCE_BOTTOM = 40;
-const SOURCE_SIDE = 48;
-const MAX_RENDERED_IMAGE_PAGES = 12;
-const MAX_SOURCE_IMAGE_PAGES = 2000;
-const MAX_IMAGE_ARCHIVE_BYTES = 128 * 1024 * 1024;
+const MAX_DIRECT_RENDER_PAGES = 12;
+const MAX_IMAGE_EXPORT_PAGES = 2000;
+const PAGE_GUTTER = 32;
+const PAGE_FILL_FALLBACK = 0.55;
 const TRANSPARENT_PIXEL =
   'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
@@ -27,348 +29,458 @@ function cssColor(name, fallback) {
   return value || fallback;
 }
 
-function waitForImages(root, timeout = 3000) {
-  const pending = [...root.querySelectorAll('img')].filter((image) => !image.complete);
+function waitForAbort(signal) {
+  return new Promise((_, reject) => {
+    if (!signal) {
+      return;
+    }
+    if (signal.aborted) {
+      reject(signal.reason instanceof Error ? signal.reason : abortError());
+      return;
+    }
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+}
 
+async function waitForImages(root, { signal, timeout = 10000 } = {}) {
+  throwIfAborted(signal);
+  const pending = [...root.querySelectorAll('img')].filter((image) => !image.complete);
   if (!pending.length) {
-    return Promise.resolve();
+    return;
   }
 
   const settled = Promise.all(pending.map((image) => new Promise((resolve) => {
     image.addEventListener('load', resolve, { once: true });
     image.addEventListener('error', resolve, { once: true });
   })));
+  const timeoutPromise = new Promise((resolve) => window.setTimeout(resolve, timeout));
+  await Promise.race([settled, timeoutPromise, waitForAbort(signal)]);
+  throwIfAborted(signal);
+}
 
-  return Promise.race([
-    settled,
-    new Promise((resolve) => window.setTimeout(resolve, timeout))
-  ]);
+function remoteImagePlaceholder(image) {
+  const label = document.createElement('span');
+  const alternative = image.getAttribute('alt')?.trim();
+  label.className = 'image-export-remote-image';
+  label.textContent = alternative
+    ? `[\u7f51\u7edc\u56fe\u7247\uff1a${alternative}]`
+    : '[\u7f51\u7edc\u56fe\u7247\u672a\u5305\u542b]';
+  image.replaceWith(label);
 }
 
 function replaceRemoteImages(root) {
+  let failedImages = 0;
   for (const image of root.querySelectorAll('img')) {
     const source = image.currentSrc || image.getAttribute('src') || '';
-    if (!/^https?:\/\//i.test(source)) {
-      continue;
+    if (/^https?:\/\//i.test(source)) {
+      remoteImagePlaceholder(image);
+      failedImages += 1;
     }
+  }
+  return { includedImages: 0, failedImages };
+}
 
-    const label = document.createElement('span');
-    const alternative = image.getAttribute('alt')?.trim();
-    label.className = 'image-export-remote-image';
-    label.textContent = alternative
-      ? `[网络图片：${alternative}]`
-      : '[网络图片未包含]';
-    image.replaceWith(label);
+function prepareExportContents(contents) {
+  contents.classList.add('image-export-content');
+  Object.assign(contents.style, {
+    boxSizing: 'border-box',
+    width: `${DEFAULT_IMAGE_EXPORT_WIDTH}px`,
+    maxWidth: 'none',
+    minHeight: '0',
+    margin: '0',
+    padding: '0 48px'
+  });
+  for (const image of contents.querySelectorAll('img')) {
+    Object.assign(image.style, {
+      maxWidth: '100%',
+      maxHeight: `${DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT - PAGE_GUTTER * 2}px`,
+      objectFit: 'contain'
+    });
   }
 }
 
-function createZipCollector() {
-  const chunks = [];
-  let totalBytes = 0;
-  let resolveFinished;
-  let rejectFinished;
-  const finished = new Promise((resolve, reject) => {
-    resolveFinished = resolve;
-    rejectFinished = reject;
-  });
-  const zip = new Zip((error, chunk, final) => {
-    if (error) {
-      rejectFinished(error);
-      return;
-    }
+function elementOffset(element, rootRect) {
+  const rect = element.getBoundingClientRect();
+  return {
+    top: Math.max(0, rect.top - rootRect.top),
+    bottom: Math.max(0, rect.bottom - rootRect.top)
+  };
+}
 
-    chunks.push(chunk);
-    if (final) {
-      resolveFinished(new Blob(chunks, { type: 'application/zip' }));
+export function collectVisualPageBoundaries(contents, contentHeight) {
+  const rootRect = contents.getBoundingClientRect();
+  const values = new Set([0, contentHeight]);
+  const orphanHeadingBoundaries = new Set();
+  const selector = [
+    ':scope > *',
+    ':scope > ul > li',
+    ':scope > ol > li',
+    ':scope > table tr',
+    ':scope > blockquote > *',
+    ':scope img'
+  ].join(',');
+
+  for (const element of contents.querySelectorAll(selector)) {
+    const { top, bottom } = elementOffset(element, rootRect);
+    if (top > 0 && top < contentHeight) {
+      values.add(top);
     }
-  });
+    if (bottom > 0 && bottom < contentHeight) {
+      values.add(bottom);
+    }
+    if (/^H[1-6]$/.test(element.tagName)) {
+      orphanHeadingBoundaries.add(bottom);
+    }
+  }
 
   return {
-    async add(fileName, data) {
-      const bytes = await imageDataToUint8Array(data);
-      totalBytes += bytes.byteLength;
-      if (totalBytes > MAX_IMAGE_ARCHIVE_BYTES) {
-        throw new Error('分页图片超过 128 MiB，请拆分文档后再导出');
+    boundaries: [...values].sort((left, right) => left - right),
+    orphanHeadingBoundaries
+  };
+}
+
+export function createVisualPageRanges({
+  contentHeight,
+  boundaries,
+  orphanHeadingBoundaries = new Set(),
+  usableHeight = DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT - PAGE_GUTTER * 2
+}) {
+  const ranges = [];
+  let start = 0;
+
+  while (start < contentHeight) {
+    const target = Math.min(contentHeight, start + usableHeight);
+    if (target >= contentHeight) {
+      ranges.push({ start, end: contentHeight });
+      break;
+    }
+
+    const candidates = boundaries.filter((value) => (
+      value > start + 1 &&
+      value <= target &&
+      !orphanHeadingBoundaries.has(value)
+    ));
+    let end = candidates.at(-1) || target;
+    if (end - start < usableHeight * PAGE_FILL_FALLBACK) {
+      end = target;
+    }
+    if (end <= start) {
+      end = target;
+    }
+    ranges.push({ start, end });
+    start = end;
+  }
+
+  return ranges.length ? ranges : [{ start: 0, end: 1 }];
+}
+
+function createStage() {
+  const stage = document.createElement('div');
+  const viewport = document.createElement('div');
+  const mount = document.createElement('div');
+  stage.className = 'reader-panel image-export-stage';
+  viewport.className = 'image-export-viewport';
+  viewport.style.width = `${DEFAULT_IMAGE_EXPORT_WIDTH}px`;
+  mount.className = 'image-export-mount';
+  mount.style.width = `${DEFAULT_IMAGE_EXPORT_WIDTH}px`;
+  viewport.append(mount);
+  stage.append(viewport);
+  document.body.append(stage);
+  return { stage, viewport, mount };
+}
+
+async function inlineExportImages(contents, inlineImages, options) {
+  if (!inlineImages) {
+    return { ...replaceRemoteImages(contents), release: () => {} };
+  }
+  const result = await inlineImages(contents, options);
+  return {
+    includedImages: result?.includedImages ?? result?.included ?? 0,
+    failedImages: result?.failedImages ?? result?.failed ?? 0,
+    release: result?.release || (() => {})
+  };
+}
+
+async function renderRange({ viewport, mount, range, signal, backgroundColor }) {
+  throwIfAborted(signal);
+  const height = Math.min(
+    DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT,
+    Math.max(1, Math.ceil(range.end - range.start + PAGE_GUTTER * 2))
+  );
+  viewport.style.height = `${height}px`;
+  mount.style.transform = `translateY(${PAGE_GUTTER - range.start}px)`;
+
+  const blob = await elementToBlob(viewport, {
+    width: DEFAULT_IMAGE_EXPORT_WIDTH,
+    height,
+    pixelRatio: DEFAULT_IMAGE_EXPORT_SCALE,
+    backgroundColor,
+    imagePlaceholder: TRANSPARENT_PIXEL,
+    fontEmbedCSS: '',
+    skipAutoScale: true,
+    fetchRequestInit: signal ? { signal } : undefined
+  });
+  throwIfAborted(signal);
+  if (!blob) {
+    throw new Error('\u6d4f\u89c8\u5668\u6ca1\u6709\u751f\u6210\u56fe\u7247\u6570\u636e');
+  }
+  return blob;
+}
+
+async function renderPreparedContents({
+  contents,
+  viewport,
+  mount,
+  signal,
+  onProgress,
+  onPage,
+  pageNumberStart = 0,
+  sourceCompleted,
+  sourceTotal,
+  imageStats
+}) {
+  prepareExportContents(contents);
+  await (document.fonts?.ready || Promise.resolve());
+  await waitForImages(contents, { signal });
+  const contentHeight = Math.max(1, Math.ceil(contents.scrollHeight));
+  const { boundaries, orphanHeadingBoundaries } = collectVisualPageBoundaries(
+    contents,
+    contentHeight
+  );
+  const ranges = createVisualPageRanges({
+    contentHeight,
+    boundaries,
+    orphanHeadingBoundaries
+  });
+  const backgroundColor = cssColor('--surface', '#ffffff');
+  let pageNumber = pageNumberStart;
+
+  for (const range of ranges) {
+    throwIfAborted(signal);
+    pageNumber += 1;
+    if (pageNumber > MAX_IMAGE_EXPORT_PAGES) {
+      throw new Error('\u5206\u9875\u56fe\u7247\u8d85\u8fc7 2,000 \u9875\uff0c\u8bf7\u62c6\u5206\u6587\u6863\u540e\u518d\u5bfc\u51fa');
+    }
+    onProgress?.({
+      phase: 'rendering',
+      completed: sourceCompleted,
+      total: sourceTotal,
+      pageCount: pageNumber - 1,
+      ...imageStats
+    });
+    const blob = await renderRange({
+      viewport,
+      mount,
+      range,
+      signal,
+      backgroundColor
+    });
+    const cssHeight = Math.min(
+      DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT,
+      range.end - range.start + PAGE_GUTTER * 2
+    );
+    await onPage(blob, {
+      pageNumber,
+      width: DEFAULT_IMAGE_EXPORT_WIDTH * DEFAULT_IMAGE_EXPORT_SCALE,
+      height: Math.round(cssHeight * DEFAULT_IMAGE_EXPORT_SCALE)
+    });
+    await yieldToMainThread();
+  }
+
+  mount.style.transform = '';
+  return { pageNumber, rangeCount: ranges.length };
+}
+
+function normalizeRenderedChunk(rendered, mount) {
+  if (rendered instanceof Element) {
+    return { contents: rendered, destroy: () => {} };
+  }
+  const contents = rendered?.contents || mount.querySelector('.toastui-editor-contents');
+  if (!contents) {
+    throw new Error('\u65e0\u6cd5\u751f\u6210 Markdown \u9605\u8bfb\u6392\u7248');
+  }
+  return { contents, destroy: rendered?.destroy || (() => {}) };
+}
+
+export async function renderMarkdownSourceAsImages({
+  lineSource,
+  fileName,
+  renderChunk,
+  inlineImages,
+  signal,
+  onProgress,
+  onPage,
+  forceArchive = true
+}) {
+  if (typeof renderChunk !== 'function') {
+    throw new TypeError('\u957f\u6587\u5bfc\u51fa\u9700\u8981 Markdown \u5206\u5757\u6e32\u67d3\u5668');
+  }
+  const collector = onPage ? null : createImagePageCollector({
+    fileName,
+    forceArchive,
+    signal
+  });
+  const consumePage = onPage || ((blob) => collector.add(blob));
+  const { stage, viewport, mount } = createStage();
+  const imageStats = { includedImages: 0, failedImages: 0 };
+  const remoteImageSession = { urls: new Set(), usedBytes: 0, cache: new Map() };
+  let pageCount = 0;
+
+  try {
+    const inspected = await inspectMarkdownForExport(lineSource, { signal, onProgress });
+    for await (const chunk of iterateMarkdownExportChunks(lineSource, {
+      ...inspected,
+      signal,
+      onProgress
+    })) {
+      throwIfAborted(signal);
+      onProgress?.({
+        phase: 'layout',
+        completed: chunk.sourceStart,
+        total: inspected.totalCharacters,
+        pageCount,
+        ...imageStats
+      });
+      const rendered = normalizeRenderedChunk(
+        await renderChunk(chunk.markdown, mount),
+        mount
+      );
+      try {
+        const batchImages = await inlineExportImages(rendered.contents, inlineImages, {
+          signal,
+          session: remoteImageSession,
+          onProgress: (event) => onProgress?.({
+            ...event,
+            includedImages: imageStats.includedImages + (event.includedImages || 0),
+            failedImages: imageStats.failedImages + (event.failedImages || 0),
+            pageCount
+          })
+        });
+        imageStats.includedImages += batchImages.includedImages;
+        imageStats.failedImages += batchImages.failedImages;
+        try {
+          const result = await renderPreparedContents({
+            contents: rendered.contents,
+            viewport,
+            mount,
+            signal,
+            onProgress,
+            onPage: consumePage,
+            pageNumberStart: pageCount,
+            sourceCompleted: chunk.sourceEnd,
+            sourceTotal: inspected.totalCharacters,
+            imageStats
+          });
+          pageCount = result.pageNumber;
+        } finally {
+          batchImages.release();
+        }
+      } finally {
+        await rendered.destroy();
+        mount.replaceChildren();
+        mount.style.transform = '';
       }
-
-      const file = new ZipPassThrough(fileName);
-      zip.add(file);
-      file.push(bytes, true);
-    },
-    close() {
-      zip.end();
-      return finished;
     }
-  };
-}
 
-async function collectPages(plan, renderPage, onProgress) {
-  let singlePage = null;
-  const archive = plan.pageCount > 1 ? createZipCollector() : null;
-
-  for (const page of iterateImageExportPages(plan)) {
-    onProgress?.(page.pageNumber, page.pageCount);
-    const data = await renderPage(page);
-    if (archive) {
-      await archive.add(page.fileName, data);
-    } else {
-      singlePage = data;
-    }
-  }
-
-  if (!archive) {
-    return {
-      blob: singlePage,
-      fileName: `${plan.baseName}.png`,
-      pageCount: plan.pageCount
+    onProgress?.({
+      phase: 'packaging',
+      completed: inspected.totalCharacters,
+      total: inspected.totalCharacters,
+      pageCount,
+      ...imageStats
+    });
+    const output = collector ? await collector.finish() : {
+      kind: forceArchive || pageCount > 1 ? 'zip' : 'png',
+      blob: null,
+      fileName: forceArchive || pageCount > 1
+        ? `${imageExportBaseName(fileName)}-\u56fe\u7247.zip`
+        : `${imageExportBaseName(fileName)}.png`,
+      pageCount
     };
+    return { ...output, ...imageStats };
+  } catch (error) {
+    collector?.abort();
+    throw error;
+  } finally {
+    stage.remove();
   }
-
-  return {
-    blob: await archive.close(),
-    fileName: `${plan.baseName}-图片.zip`,
-    pageCount: plan.pageCount
-  };
 }
 
 export async function renderMarkdownAsImages({
   contents,
   fileName,
   lineSource,
-  onProgress
+  renderChunk,
+  inlineImages,
+  signal,
+  onProgress,
+  onPage
 }) {
-  const stage = document.createElement('div');
-  const viewport = document.createElement('div');
+  const { stage, viewport, mount } = createStage();
   const clonedContents = contents.cloneNode(true);
-  stage.className = 'reader-panel image-export-stage';
-  viewport.className = 'image-export-viewport';
-  clonedContents.classList.add('image-export-content');
-  viewport.append(clonedContents);
-  stage.append(viewport);
-  document.body.append(stage);
+  mount.append(clonedContents);
+  prepareExportContents(clonedContents);
 
   try {
-    replaceRemoteImages(clonedContents);
-    await document.fonts?.ready;
-    await waitForImages(clonedContents);
-    const contentHeight = Math.max(1, Math.ceil(clonedContents.scrollHeight));
-    const plan = createImageExportPlan({ contentHeight, fileName });
-    const backgroundColor = cssColor('--surface', '#ffffff');
-
-    if (plan.pageCount > MAX_RENDERED_IMAGE_PAGES && lineSource) {
+    await (document.fonts?.ready || Promise.resolve());
+    const estimatedPages = Math.ceil(
+      Math.max(1, clonedContents.scrollHeight) /
+      (DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT - PAGE_GUTTER * 2)
+    );
+    if (estimatedPages > MAX_DIRECT_RENDER_PAGES && lineSource && renderChunk) {
       stage.remove();
-      return await renderSourceAsImages({ lineSource, fileName, onProgress });
+      return await renderMarkdownSourceAsImages({
+        lineSource,
+        fileName,
+        renderChunk,
+        inlineImages,
+        signal,
+        onProgress,
+        onPage,
+        forceArchive: true
+      });
     }
 
-    return await collectPages(plan, async (page) => {
-      viewport.style.width = `${page.cssWidth}px`;
-      viewport.style.height = `${page.cssHeight}px`;
-      clonedContents.style.transform = `translateY(-${page.offsetY}px)`;
-      const blob = await elementToBlob(viewport, {
-        width: page.cssWidth,
-        height: page.cssHeight,
-        pixelRatio: plan.scale,
-        backgroundColor,
-        imagePlaceholder: TRANSPARENT_PIXEL,
-        fontEmbedCSS: '',
-        skipAutoScale: true
+    const inlineResult = await inlineExportImages(clonedContents, inlineImages, {
+      signal,
+      session: { urls: new Set(), usedBytes: 0, cache: new Map() },
+      onProgress
+    });
+    const imageStats = {
+      includedImages: inlineResult.includedImages,
+      failedImages: inlineResult.failedImages
+    };
+    const collector = onPage ? null : createImagePageCollector({ fileName, signal });
+    const consumePage = onPage || ((blob) => collector.add(blob));
+    try {
+      const { pageNumber: pageCount } = await renderPreparedContents({
+        contents: clonedContents,
+        viewport,
+        mount,
+        signal,
+        onProgress,
+        onPage: consumePage,
+        pageNumberStart: 0,
+        sourceCompleted: 1,
+        sourceTotal: 1,
+        imageStats
       });
-
-      if (!blob) {
-        throw new Error('浏览器没有生成图片数据');
-      }
-
-      return blob;
-    }, onProgress);
+      const output = collector ? await collector.finish() : {
+        kind: pageCount > 1 ? 'zip' : 'png',
+        blob: null,
+        fileName: pageCount > 1
+          ? `${imageExportBaseName(fileName)}-\u56fe\u7247.zip`
+          : `${imageExportBaseName(fileName)}.png`,
+        pageCount
+      };
+      return { ...output, ...imageStats };
+    } catch (error) {
+      collector?.abort();
+      throw error;
+    } finally {
+      inlineResult.release();
+    }
   } finally {
     stage.remove();
   }
-}
-
-function* wrapSourceLine(context, source, maximumWidth, startOffset = 0) {
-  const text = String(source);
-
-  if (!text) {
-    if (startOffset === 0) {
-      yield { text: '', start: 0, end: 0 };
-    }
-    return;
-  }
-
-  const minimumAdvance = Math.max(
-    1,
-    Math.min(
-      context.measureText('i').width,
-      context.measureText(' ').width,
-      context.measureText('.').width
-    )
-  );
-  const maximumCharacters = Math.max(32, Math.ceil(maximumWidth / minimumAdvance) + 16);
-  let start = Math.min(Math.max(0, startOffset), text.length);
-  while (start < text.length) {
-    let low = start + 1;
-    let high = Math.min(text.length, start + maximumCharacters);
-    let best = low;
-    while (low <= high) {
-      const middle = Math.floor((low + high) / 2);
-      const measured = text.slice(start, middle).replaceAll('\t', '  ');
-      if (context.measureText(measured).width <= maximumWidth) {
-        best = middle;
-        low = middle + 1;
-      } else {
-        high = middle - 1;
-      }
-    }
-
-    if (/^[\uDC00-\uDFFF]$/.test(text[best]) && best > start + 1) {
-      best -= 1;
-    }
-
-    const candidate = text.slice(start, best);
-    const softBreak = candidate.search(/\s+\S*$/);
-    if (softBreak > Math.floor(candidate.length * 0.6)) {
-      best = start + softBreak + candidate.slice(softBreak).match(/^\s+/)[0].length;
-    }
-
-    yield {
-      text: text.slice(start, best).replaceAll('\t', '  ').replace(/\s+$/u, ''),
-      start,
-      end: best
-    };
-    start = best;
-  }
-}
-
-function buildSourcePageStarts(lineSource, context, maximumWidth, rowsPerPage) {
-  const starts = [];
-  let row = 0;
-
-  for (let lineNumber = 1; lineNumber <= lineSource.lineCount; lineNumber += 1) {
-    for (const segment of wrapSourceLine(context, lineSource.getLine(lineNumber), maximumWidth)) {
-      if (row % rowsPerPage === 0) {
-        starts.push({ lineNumber, offset: segment.start });
-        if (starts.length > MAX_SOURCE_IMAGE_PAGES) {
-          throw new Error('分页图片超过 2,000 页，请拆分文档后再导出');
-        }
-      }
-      row += 1;
-    }
-  }
-
-  return starts.length ? starts : [{ lineNumber: 1, offset: 0 }];
-}
-
-function canvasToPng(canvas) {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
-      } else {
-        reject(new Error('浏览器没有生成 PNG 图片'));
-      }
-    }, 'image/png');
-  });
-}
-
-export async function renderSourceAsImages({
-  lineSource,
-  fileName,
-  onProgress
-}) {
-  let cachedLineNumber = 0;
-  let cachedLineText = '';
-  const readLine = (lineNumber) => {
-    if (lineNumber !== cachedLineNumber) {
-      cachedLineNumber = lineNumber;
-      cachedLineText = lineSource.getLine(lineNumber);
-    }
-    return cachedLineText;
-  };
-  const cssWidth = DEFAULT_IMAGE_EXPORT_WIDTH;
-  const scale = DEFAULT_IMAGE_EXPORT_SCALE;
-  const pageHeight = deriveMaxCanvasCssHeight({ width: cssWidth, scale });
-  const measureCanvas = document.createElement('canvas');
-  const measure = measureCanvas.getContext('2d');
-  measure.font = `${SOURCE_FONT_SIZE}px "Cascadia Code", Consolas, monospace`;
-  const lineNumberWidth = Math.max(56, String(lineSource.lineCount).length * 10 + 24);
-  const textWidth = cssWidth - SOURCE_SIDE * 2 - lineNumberWidth;
-  const rowsPerPage = Math.max(
-    1,
-    Math.floor((pageHeight - SOURCE_TOP - SOURCE_BOTTOM) / SOURCE_LINE_HEIGHT)
-  );
-  const pageStarts = buildSourcePageStarts(
-    { lineCount: lineSource.lineCount, getLine: readLine },
-    measure,
-    textWidth,
-    rowsPerPage
-  );
-  const plan = createImageExportPlan({
-    contentHeight: pageStarts.length * pageHeight,
-    fileName,
-    width: cssWidth,
-    scale,
-    pageHeight
-  });
-  const colors = {
-    background: cssColor('--surface-deep', '#ffffff'),
-    text: cssColor('--text', '#202020'),
-    muted: cssColor('--muted', '#666666'),
-    line: cssColor('--line', '#dddddd'),
-    accent: cssColor('--accent-strong', '#754117')
-  };
-
-  return collectPages(plan, async (page) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = page.pixelWidth;
-    canvas.height = page.pixelHeight;
-    const context = canvas.getContext('2d');
-    context.scale(scale, scale);
-    context.fillStyle = colors.background;
-    context.fillRect(0, 0, cssWidth, pageHeight);
-    context.font = `600 15px ui-sans-serif, "Microsoft YaHei", sans-serif`;
-    context.fillStyle = colors.accent;
-    context.fillText(fileName, SOURCE_SIDE, 28, cssWidth - SOURCE_SIDE * 2 - 140);
-    context.textAlign = 'right';
-    context.fillStyle = colors.muted;
-    context.fillText(`${page.pageNumber} / ${page.pageCount}`, cssWidth - SOURCE_SIDE, 28);
-    context.textAlign = 'left';
-    context.strokeStyle = colors.line;
-    context.beginPath();
-    context.moveTo(SOURCE_SIDE, 54.5);
-    context.lineTo(cssWidth - SOURCE_SIDE, 54.5);
-    context.stroke();
-    context.font = `${SOURCE_FONT_SIZE}px "Cascadia Code", Consolas, monospace`;
-    context.textBaseline = 'top';
-
-    const start = pageStarts[page.index];
-    let drawnRows = 0;
-    for (
-      let lineNumber = start.lineNumber;
-      lineNumber <= lineSource.lineCount && drawnRows < rowsPerPage;
-      lineNumber += 1
-    ) {
-      const offset = lineNumber === start.lineNumber ? start.offset : 0;
-      for (const segment of wrapSourceLine(
-        measure,
-        readLine(lineNumber),
-        textWidth,
-        offset
-      )) {
-        if (drawnRows >= rowsPerPage) {
-          break;
-        }
-
-        const y = SOURCE_TOP + drawnRows * SOURCE_LINE_HEIGHT;
-        context.textAlign = 'right';
-        context.fillStyle = colors.muted;
-        context.fillText(segment.start === 0 ? String(lineNumber) : '·', SOURCE_SIDE + lineNumberWidth - 18, y);
-        context.textAlign = 'left';
-        context.fillStyle = colors.text;
-        context.fillText(segment.text, SOURCE_SIDE + lineNumberWidth, y);
-        drawnRows += 1;
-      }
-    }
-
-    return canvasToPng(canvas);
-  }, onProgress);
 }

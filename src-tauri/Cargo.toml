@@ -1,6 +1,6 @@
 [package]
 name = "rollcat-md"
-version = "0.3.2"
+version = "0.3.3"
 description = "rollcat-md — a lightweight Markdown reader and editor for Windows and Android."
 authors = ["sonicacd"]
 license = "Apache-2.0"
@@ -20,6 +20,7 @@ serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-http = { version = "=2.6.0", default-features = false, features = ["rustls-tls", "http2", "charset", "system-proxy"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }

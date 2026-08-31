@@ -60,11 +60,11 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 
 点击工具栏“图片”可导出当前文档：
 
-- 内容能放入一页时，保存为单个 PNG 图片。
-- 渲染内容不超过 12 页时，自动生成分页 PNG，并打包为一个 ZIP 文件。
-- 超过 12 页或达到 **2.5 MiB（2,621,440 字节）** 的文档按带行号的 Markdown 源码分页导出，避免反复排版全文或创建超大画布。
-- 如果预计超过 2,000 页或分页图片累计超过 128 MiB，导出会停止并提示拆分文档，避免耗尽内存。
-- 网络图片受跨域安全限制，导出时会以图片的替代文字占位，不会静默生成空白区域。
+- 点击后会先显示确认弹窗；选择“开始导出”后，同一弹窗会显示解析、下载网络图片、排版、生成、打包和保存进度。生成期间可随时取消，取消后不会写入目标文件。
+- 每张 PNG 宽 1440px、高度最多约 4072px（约两张竖版 A4）；内容不足时会按实际高度裁短。一页直接保存为 PNG，多页使用固定四位编号（如 `小说-0001.png`）并打包为 ZIP。
+- 超长文档按块保持阅读视图的 Markdown 排版，不再退化为带行号的源码图片；每批内容及其临时排版元素在生成后立即释放。
+- Windows 和 Android 原生版把多页图片流式写入临时 ZIP，最多导出 2,000 页；浏览器版仍在内存中生成 ZIP，累计达到 128 MiB 时会停止并提示拆分文档。
+- 导出可包含公网 HTTPS 地址的 PNG、JPEG、GIF 和 WebP 图片。每次导出对地址去重，使用 3 路并发；单图限 10 秒和 8 MiB，最多 32 个唯一地址、合计 32 MiB。浏览器版仍受图片服务器的 CORS 策略限制；下载失败或不支持的图片会保留替代文字占位，并在完成时汇总数量。相对本地图片路径暂不支持。
 
 ### 支持的 Markdown 格式
 
@@ -152,11 +152,11 @@ Windows 版也可以把支持的文件直接拖进程序窗口打开。单文件
 
 - 文档在本机读取、编辑和保存，不需要登录，也不会上传到服务器。
 - 软件不收集编辑器使用统计。
-- 如果文档引用网络图片，显示图片时仍可能访问对应的图片网址。
+- 显示或导出公网 HTTPS 网络图片时，软件会访问对应网址；图片服务器可能记录 IP 地址等常规请求信息。
 
 ### 当前限制
 
-- Markdown 中的相对本地图片路径暂时不能正常显示。
+- Markdown 中的相对本地图片路径暂时不能显示或导出；浏览器版导出网络图片仍受图片服务器的 CORS 策略限制。
 - 混合使用多种换行符的文档，在编辑后保存时可能统一为占主导的换行格式。
 - 大文件为减少内存占用，不会额外保留一份完整原文；混合换行在保存时也可能被统一。
 - 仅支持 UTF-8 文本，不会自动猜测或转换其他编码。
@@ -235,11 +235,11 @@ Select **Go to Line** on the toolbar or press `Ctrl+G`, then enter a line number
 
 Select **Image** on the toolbar to export the current document:
 
-- Content that fits on one page is saved as a single PNG image.
-- Rendered content up to 12 pages is split into paginated PNG images and packaged in one ZIP file.
-- Documents over 12 pages or at least **2.5 MiB (2,621,440 bytes)** are exported as paginated Markdown source with line numbers, avoiding repeated full-document layout and oversized canvases.
-- Export stops with a prompt to split the document if it would exceed 2,000 pages or 128 MiB of paginated images, preventing memory exhaustion.
-- Remote images are represented by their alternative text during export because of cross-origin security restrictions, rather than being silently omitted.
+- Selecting **Image** first opens a confirmation dialog. After **Start Export** is selected, the same dialog shows progress for parsing, downloading remote images, layout, rendering, packaging, and saving. The operation can be cancelled while content is being generated, without writing the destination file.
+- Each PNG is 1440px wide and up to approximately 4072px high (about two portrait A4 pages); shorter content is cropped to its actual height. One page is saved directly as PNG, while multiple pages use fixed four-digit names such as `novel-0001.png` and are packaged as ZIP.
+- Very long documents are laid out in chunks while preserving the Reader-style Markdown presentation. They no longer fall back to source-code images with line numbers, and each chunk's temporary layout is released after it is rendered.
+- Native Windows and Android builds stream multi-page output into a temporary ZIP and allow up to 2,000 pages. The browser build still creates ZIP files in memory and stops at a cumulative 128 MiB with a prompt to split the document.
+- Export can include PNG, JPEG, GIF, and WebP images from public HTTPS URLs. Each export deduplicates URLs and uses three concurrent downloads, with limits of 10 seconds and 8 MiB per image, 32 unique URLs, and 32 MiB in total. Browser exports remain subject to the image server's CORS policy; failed or unsupported images keep a visible alt-text placeholder and are counted in the completion summary. Relative local image paths are not supported yet.
 
 ### Markdown Support
 
@@ -327,11 +327,11 @@ Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-1
 
 - Documents are opened, edited, and saved locally. No account is required and document contents are not uploaded.
 - Editor usage statistics are disabled.
-- A document containing remote images may still connect to those image URLs when they are displayed.
+- Displaying or exporting public HTTPS images connects to their URLs, and the image servers may record the IP address and other standard request metadata.
 
 ### Current Limitations
 
-- Relative local image paths in Markdown are not displayed yet.
+- Relative local image paths in Markdown cannot be displayed or exported yet; browser exports of remote images remain subject to the image server's CORS policy.
 - Mixed line endings may be normalized to the dominant style after editing and saving.
 - Large files do not retain a second full copy of the original text, so mixed line endings may also be normalized when saved.
 - Only UTF-8 text is supported; other encodings are not guessed or converted automatically.

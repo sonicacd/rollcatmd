@@ -2,7 +2,7 @@
 <html lang="zh-CN" data-theme="eye">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' tauri: asset: data: blob:; img-src 'self' tauri: asset: file: data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' tauri: asset: data: blob:; img-src 'self' tauri: asset: file: data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: ipc: http://ipc.localhost https://ipc.localhost;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <title>滚猫md</title>
 </head>
@@ -47,7 +47,13 @@
           aria-controls="goToLineDialog"
           aria-keyshortcuts="Control+G Meta+G"
         >跳转</button>
-        <button class="tool-button" id="exportImageButton" type="button">图片</button>
+        <button
+          class="tool-button"
+          id="exportImageButton"
+          type="button"
+          aria-haspopup="dialog"
+          aria-controls="imageExportDialog"
+        >图片</button>
         <button class="tool-button" id="helpButton" type="button" aria-haspopup="dialog" aria-controls="helpDialog">帮助</button>
       </nav>
 
@@ -162,7 +168,10 @@
               Windows 版可将 <code>.md</code>、<code>.markdown</code>、<code>.mdown</code>、<code>.mkd</code> 或 <code>.txt</code>
               直接拖到窗口打开。
             </p>
-            <p>长文档会自动导出为分页 PNG 压缩包；大型文档按源码分页，避免生成超大画布。</p>
+            <p>
+              “图片”会先打开确认和进度弹窗。单张最长约两张竖版 A4；长文按阅读排版分块生成，
+              一页保存 PNG，多页打包 ZIP。生成期间可取消，网络图片失败时保留明显占位。
+            </p>
           </section>
 
           <section class="help-section" aria-labelledby="helpViewsTitle">
@@ -207,6 +216,59 @@
           </section>
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <dialog
+    class="image-export-dialog"
+    id="imageExportDialog"
+    aria-labelledby="imageExportDialogTitle"
+    aria-describedby="imageExportDialogDescription"
+  >
+    <div class="image-export-dialog-frame">
+      <header class="image-export-dialog-header">
+        <div>
+          <div class="image-export-dialog-kicker">PNG 图片</div>
+          <h2 id="imageExportDialogTitle">导出图片</h2>
+        </div>
+      </header>
+
+      <div class="image-export-dialog-content">
+        <section class="image-export-dialog-panel" id="imageExportConfirmPanel">
+          <p id="imageExportDialogDescription">
+            导出将在确认后开始。内容较多时会自动生成多张 PNG，并打包为 ZIP。
+          </p>
+          <p class="image-export-dialog-note" id="imageExportConfirmNote">
+            每张图片最长约为两张竖版 A4；开始后可以随时取消。
+          </p>
+        </section>
+
+        <section
+          class="image-export-dialog-panel image-export-progress-panel"
+          id="imageExportProgressPanel"
+          aria-live="polite"
+          aria-atomic="true"
+          hidden
+        >
+          <div class="image-export-progress-heading">
+            <strong id="imageExportPhase">正在解析文档</strong>
+            <span id="imageExportProgressValue" aria-hidden="true"></span>
+          </div>
+          <progress
+            id="imageExportProgress"
+            max="1"
+            aria-labelledby="imageExportPhase"
+            aria-describedby="imageExportDetail imageExportStats"
+          ></progress>
+          <p id="imageExportDetail">正在准备导出…</p>
+          <p class="image-export-stats" id="imageExportStats" hidden></p>
+        </section>
+      </div>
+
+      <footer class="image-export-dialog-actions">
+        <button id="cancelImageExportButton" type="button">取消</button>
+        <button class="primary" id="startImageExportButton" type="button">开始导出</button>
+      </footer>
     </div>
   </dialog>
 

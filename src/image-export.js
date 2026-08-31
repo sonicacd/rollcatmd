@@ -1,7 +1,12 @@
 export const MAX_CANVAS_SIDE = 4096;
 export const MAX_CANVAS_PIXELS = 16_000_000;
-export const DEFAULT_IMAGE_EXPORT_WIDTH = 1200;
+// 720 CSS pixels at 2x produces a 1440px-wide image. Two portrait A4 pages
+// stacked vertically are 2 * sqrt(2) times as tall as they are wide.
+export const DEFAULT_IMAGE_EXPORT_WIDTH = 720;
 export const DEFAULT_IMAGE_EXPORT_SCALE = 2;
+export const DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT = Math.floor(
+  DEFAULT_IMAGE_EXPORT_WIDTH * Math.SQRT2 * 2
+);
 
 const WINDOWS_RESERVED_FILE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
 const INVALID_FILE_NAME_CHARACTERS = /[<>:"/\\|?*\u0000-\u001f]/g;
@@ -70,6 +75,10 @@ export function buildImagePageFileName(fileName, pageNumber, pageCount) {
     : `${imageExportBaseName(fileName)}-${String(pageNumber).padStart(digits, '0')}.png`;
 }
 
+export function buildStreamingImagePageFileName(fileName, pageNumber) {
+  return `${imageExportBaseName(fileName)}-${String(pageNumber).padStart(4, '0')}.png`;
+}
+
 export function createImageExportPlan({
   contentHeight,
   fileName = '未命名.md',
@@ -87,7 +96,7 @@ export function createImageExportPlan({
   const pixelScale = positiveNumber(scale, '导出缩放');
   const safePageCssHeight = deriveMaxCanvasCssHeight({ width: cssWidth, scale: pixelScale });
   const pageCssHeight = pageHeight === undefined
-    ? safePageCssHeight
+    ? Math.min(safePageCssHeight, DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT)
     : Math.min(safePageCssHeight, Math.floor(positiveNumber(pageHeight, '单页高度')));
   const pageCount = Math.ceil(contentCssHeight / pageCssHeight);
 
