@@ -43,11 +43,11 @@ test('Help uses theme-aware modal styling and a touch-friendly responsive layout
   );
 });
 
-test('the five-button toolbar has enough desktop space and fits one mobile row', () => {
+test('the seven-button toolbar fits one mobile row', () => {
   assert.match(styles, /\.toolbar\s*\{[\s\S]*?flex:\s*2 1 310px;/);
   assert.match(
     styles,
-    /@media \(max-width:\s*820px\)[\s\S]*?\.toolbar\s*\{[\s\S]*?grid-template-columns:\s*repeat\(5, minmax\(44px, 64px\)\);/
+    /@media \(max-width:\s*820px\)[\s\S]*?\.toolbar\s*\{[\s\S]*?grid-template-columns:\s*repeat\(7, minmax\(40px, 58px\)\);/
   );
 });
 

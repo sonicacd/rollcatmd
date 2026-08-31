@@ -34,11 +34,20 @@
         <span class="mobile-chrome-toggle-label">收起界面控件</span>
       </button>
 
-      <nav class="toolbar" id="mobileFileToolbar" aria-label="文件和帮助操作">
+      <nav class="toolbar" id="mobileFileToolbar" aria-label="文件、编辑和帮助操作">
         <button class="tool-button" id="newButton" type="button" aria-keyshortcuts="Control+N Meta+N">新建</button>
         <button class="tool-button" id="openButton" type="button" aria-keyshortcuts="Control+O Meta+O">打开</button>
         <button class="tool-button primary" id="saveButton" type="button" aria-keyshortcuts="Control+S Meta+S">保存</button>
         <button class="tool-button" id="saveAsButton" type="button" aria-keyshortcuts="Control+Shift+S Meta+Shift+S">另存为</button>
+        <button
+          class="tool-button"
+          id="goToLineButton"
+          type="button"
+          aria-haspopup="dialog"
+          aria-controls="goToLineDialog"
+          aria-keyshortcuts="Control+G Meta+G"
+        >跳转</button>
+        <button class="tool-button" id="exportImageButton" type="button">图片</button>
         <button class="tool-button" id="helpButton" type="button" aria-haspopup="dialog" aria-controls="helpDialog">帮助</button>
       </nav>
 
@@ -147,11 +156,13 @@
               <div><dt>打开</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div>
               <div><dt>保存</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div>
               <div><dt>另存为</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></dd></div>
+              <div><dt>导出图片</dt><dd>工具栏“图片”</dd></div>
             </dl>
             <p>
               Windows 版可将 <code>.md</code>、<code>.markdown</code>、<code>.mdown</code>、<code>.mkd</code> 或 <code>.txt</code>
               直接拖到窗口打开。
             </p>
+            <p>长文档会自动导出为分页 PNG 压缩包；大型文档按源码分页，避免生成超大画布。</p>
           </section>
 
           <section class="help-section" aria-labelledby="helpViewsTitle">
@@ -160,10 +171,12 @@
               <div><dt>所见即所得</dt><dd><kbd>Ctrl</kbd> + <kbd>1</kbd></dd></div>
               <div><dt>源码</dt><dd><kbd>Ctrl</kbd> + <kbd>2</kbd></dd></div>
               <div><dt>阅读</dt><dd><kbd>Ctrl</kbd> + <kbd>3</kbd></dd></div>
+              <div><dt>跳转到行</dt><dd><kbd>Ctrl</kbd> + <kbd>G</kbd></dd></div>
             </dl>
             <p>
               三个模式中打开查找和替换都会保持当前界面；阅读模式也允许替换，内容会即时刷新。
             </p>
+            <p>普通文档从所见即所得或阅读视图跳转到行时，会切换到源码视图以精确定位。</p>
           </section>
 
           <section class="help-section" aria-labelledby="helpFindTitle">
@@ -195,6 +208,51 @@
         </div>
       </div>
     </div>
+  </dialog>
+
+  <dialog
+    class="go-to-line-dialog"
+    id="goToLineDialog"
+    aria-labelledby="goToLineTitle"
+    aria-describedby="goToLineSummary goToLineError"
+  >
+    <form class="go-to-line-form" id="goToLineForm" method="dialog" novalidate>
+      <header class="go-to-line-header">
+        <h2 id="goToLineTitle">跳转到行</h2>
+        <button
+          class="go-to-line-close"
+          id="closeGoToLineButton"
+          type="button"
+          title="关闭（Esc）"
+          aria-label="关闭跳转到行"
+          aria-keyshortcuts="Escape"
+        >×</button>
+      </header>
+
+      <div class="go-to-line-content">
+        <p class="go-to-line-summary" id="goToLineSummary">
+          当前第 <output id="currentLineNumber">1</output> 行，共 <output id="totalLineNumber">1</output> 行
+        </p>
+        <label for="goToLineInput">行号</label>
+        <input
+          id="goToLineInput"
+          name="line"
+          type="number"
+          min="1"
+          step="1"
+          inputmode="numeric"
+          autocomplete="off"
+          required
+          aria-keyshortcuts="Enter"
+        >
+        <p id="goToLineError" role="alert" aria-live="assertive" hidden></p>
+      </div>
+
+      <footer class="go-to-line-actions">
+        <button id="cancelGoToLineButton" type="button">取消</button>
+        <button class="primary" type="submit">跳转</button>
+      </footer>
+    </form>
   </dialog>
 
   <script type="module" src="/src/renderer.js"></script>

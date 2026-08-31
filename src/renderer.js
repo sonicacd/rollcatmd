@@ -70,6 +70,12 @@ import {
   replaceAllText
 } from './find-replace.js';
 import { registerNativeFileDrop } from './file-drop.js';
+import { countTextLines, parseLineNumber } from './go-to-line.js';
+import { imageDataToUint8Array } from './image-export.js';
+import {
+  renderMarkdownAsImages,
+  renderSourceAsImages
+} from './image-export-runtime.js';
 import './styles.css';
 
 const initialTheme = applyTheme(readStoredTheme(), { persist: false });
@@ -158,6 +164,17 @@ const helpElements = {
   closeButton: document.querySelector('#closeHelpButton')
 };
 
+const goToLineElements = {
+  dialog: document.querySelector('#goToLineDialog'),
+  form: document.querySelector('#goToLineForm'),
+  input: document.querySelector('#goToLineInput'),
+  current: document.querySelector('#currentLineNumber'),
+  total: document.querySelector('#totalLineNumber'),
+  error: document.querySelector('#goToLineError'),
+  closeButton: document.querySelector('#closeGoToLineButton'),
+  cancelButton: document.querySelector('#cancelGoToLineButton')
+};
+
 const markdownFilters = [
   { name: 'Markdown 文件', extensions: ['md', 'markdown', 'mdown', 'mkd'] },
   { name: '文本文件', extensions: ['txt'] }
@@ -208,6 +225,8 @@ const controls = {
   openButton: document.querySelector('#openButton'),
   saveButton: document.querySelector('#saveButton'),
   saveAsButton: document.querySelector('#saveAsButton'),
+  goToLineButton: document.querySelector('#goToLineButton'),
+  exportImageButton: document.querySelector('#exportImageButton'),
   helpButton: document.querySelector('#helpButton'),
   wysiwygMode: document.querySelector('#wysiwygMode'),
   markdownMode: document.querySelector('#markdownMode'),
@@ -855,6 +874,119 @@ async function saveMarkdownFile({
     invoke
   });
   return { canceled: false, filePath: targetPath, fileWritable: true };
+}
+
+function imageExportFileType(fileName) {
+  const isArchive = fileName.toLowerCase().endsWith('.zip');
+  return isArchive
+    ? {
+        description: '分页图片压缩包',
+        mimeType: 'application/zip',
+        extensions: ['zip']
+      }
+    : {
+        description: 'PNG 图片',
+        mimeType: 'image/png',
+        extensions: ['png']
+      };
+}
+
+function downloadBinaryFile(fileName, blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+async function saveImageExport(fileName, blob) {
+  const fileType = imageExportFileType(fileName);
+
+  if (isTauriRuntime()) {
+    const targetPath = await saveDialog({
+      title: '保存图片',
+      defaultPath: fileName,
+      filters: [{ name: fileType.description, extensions: fileType.extensions }]
+    });
+
+    if (!targetPath) {
+      return { canceled: true };
+    }
+
+    await writeFile(targetPath, await imageDataToUint8Array(blob));
+    return { canceled: false, filePath: targetPath };
+  }
+
+  downloadBinaryFile(fileName, blob);
+  return { canceled: false, filePath: fileName, download: true };
+}
+
+let imageExportInProgress = false;
+
+async function exportCurrentDocumentAsImage() {
+  if (imageExportInProgress) {
+    return;
+  }
+
+  imageExportInProgress = true;
+  controls.exportImageButton.disabled = true;
+  controls.exportImageButton.setAttribute('aria-busy', 'true');
+  const fileName = getDisplayName(state.currentFilePath);
+  const reportProgress = (pageNumber, pageCount) => {
+    setStatus(`正在生成图片 ${pageNumber} / ${pageCount}…`);
+  };
+
+  try {
+    let output;
+    if (state.isLargeDocument) {
+      const documentText = largeFileEditor.state.doc;
+      output = await renderSourceAsImages({
+        fileName,
+        lineSource: {
+          lineCount: documentText.lines,
+          getLine: (lineNumber) => documentText.line(lineNumber).text
+        },
+        onProgress: reportProgress
+      });
+    } else {
+      if (state.mode !== 'reader') {
+        refreshReader();
+      }
+      const contents = viewerElement.querySelector('.toastui-editor-contents');
+      if (!contents) {
+        throw new Error('没有可导出的 Markdown 内容');
+      }
+      const markdownLines = getCurrentMarkdown().split('\n');
+      output = await renderMarkdownAsImages({
+        contents,
+        fileName,
+        lineSource: {
+          lineCount: markdownLines.length,
+          getLine: (lineNumber) => markdownLines[lineNumber - 1] ?? ''
+        },
+        onProgress: reportProgress
+      });
+    }
+
+    const result = await saveImageExport(output.fileName, output.blob);
+    if (result.canceled) {
+      setStatus('已取消图片导出');
+      return;
+    }
+
+    setStatus(output.pageCount > 1
+      ? `已导出 ${output.pageCount.toLocaleString()} 张分页图片`
+      : '图片已导出');
+  } catch (error) {
+    console.error('导出图片失败', error);
+    setStatus('图片导出失败');
+    window.alert(`导出图片失败：${error.message || error}`);
+  } finally {
+    imageExportInProgress = false;
+    controls.exportImageButton.disabled = false;
+    controls.exportImageButton.setAttribute('aria-busy', 'false');
+  }
 }
 
 async function openInitialLaunchFile() {
@@ -2241,6 +2373,119 @@ function closeFindReplace({ restoreFocus = true } = {}) {
   }
 }
 
+let goToLineReturnFocus = null;
+let restoreGoToLineFocusOnClose = true;
+let lastRequestedLine = 1;
+
+function getDocumentLineCount() {
+  return state.isLargeDocument
+    ? largeFileEditor.state.doc.lines
+    : countTextLines(getCurrentMarkdown());
+}
+
+function getCurrentLineNumber() {
+  if (state.isLargeDocument) {
+    const head = largeFileEditor.state.selection.main.head;
+    return largeFileEditor.state.doc.lineAt(head).number;
+  }
+
+  if (state.mode !== 'markdown') {
+    return Math.min(lastRequestedLine, getDocumentLineCount());
+  }
+
+  const selection = editor.getSelection();
+  const cursor = Array.isArray(selection?.[1]) ? selection[1] : selection?.[0];
+  return Math.max(1, Number(cursor?.[0]) || 1);
+}
+
+function setGoToLineError(message = '') {
+  goToLineElements.error.textContent = message;
+  goToLineElements.error.hidden = !message;
+  goToLineElements.input.setAttribute('aria-invalid', String(Boolean(message)));
+}
+
+function openGoToLine() {
+  if (goToLineElements.dialog.open) {
+    return;
+  }
+
+  goToLineReturnFocus = document.activeElement;
+  restoreGoToLineFocusOnClose = true;
+  closeFindReplace({ restoreFocus: false });
+
+  const totalLines = getDocumentLineCount();
+  const currentLine = Math.min(getCurrentLineNumber(), totalLines);
+  goToLineElements.current.value = currentLine.toLocaleString();
+  goToLineElements.total.value = totalLines.toLocaleString();
+  goToLineElements.input.max = String(totalLines);
+  goToLineElements.input.value = String(currentLine);
+  setGoToLineError();
+
+  if (typeof goToLineElements.dialog.showModal === 'function') {
+    goToLineElements.dialog.showModal();
+  } else {
+    goToLineElements.dialog.setAttribute('open', '');
+  }
+
+  window.requestAnimationFrame(() => {
+    goToLineElements.input.focus({ preventScroll: true });
+    goToLineElements.input.select();
+  });
+}
+
+function closeGoToLine({ restoreFocus = true } = {}) {
+  if (!goToLineElements.dialog.open) {
+    return;
+  }
+
+  restoreGoToLineFocusOnClose = restoreFocus;
+  if (typeof goToLineElements.dialog.close === 'function') {
+    goToLineElements.dialog.close();
+  } else {
+    goToLineElements.dialog.removeAttribute('open');
+    goToLineElements.dialog.dispatchEvent(new Event('close'));
+  }
+}
+
+function jumpToLine(line) {
+  lastRequestedLine = line;
+
+  if (state.isLargeDocument) {
+    const documentText = largeFileEditor.state.doc;
+    const offset = documentText.line(line).from;
+    largeFileEditor.dispatch({
+      selection: { anchor: offset },
+      scrollIntoView: true
+    });
+    largeFileEditor.focus();
+  } else {
+    if (state.mode !== 'markdown') {
+      setMode('markdown');
+    }
+    editor.setSelection([line, 1]);
+    editor.focus();
+  }
+
+  setStatus(`已跳转到第 ${line.toLocaleString()} 行`);
+}
+
+function submitGoToLine() {
+  const result = parseLineNumber(goToLineElements.input.value, getDocumentLineCount());
+
+  if (!result.valid) {
+    const message = result.reason === 'range'
+      ? `请输入 1 到 ${result.maximum.toLocaleString()} 之间的行号。`
+      : '请输入整数行号。';
+    setGoToLineError(message);
+    goToLineElements.input.focus({ preventScroll: true });
+    goToLineElements.input.select();
+    return;
+  }
+
+  closeGoToLine({ restoreFocus: false });
+  window.requestAnimationFrame(() => jumpToLine(result.line));
+}
+
 let helpReturnFocus = null;
 
 function openHelp() {
@@ -2315,6 +2560,8 @@ function runAction(action) {
     save: () => saveFile(false),
     'save-as': () => saveFile(true),
     find: openFindReplace,
+    'go-to-line': openGoToLine,
+    'export-image': exportCurrentDocumentAsImage,
     wysiwyg: () => changeModeFromControl('wysiwyg'),
     markdown: () => changeModeFromControl('markdown'),
     reader: () => changeModeFromControl('reader')
@@ -2335,6 +2582,8 @@ controls.newButton.addEventListener('click', newFile);
 controls.openButton.addEventListener('click', openFile);
 controls.saveButton.addEventListener('click', () => saveFile(false));
 controls.saveAsButton.addEventListener('click', () => saveFile(true));
+controls.goToLineButton.addEventListener('click', openGoToLine);
+controls.exportImageButton.addEventListener('click', exportCurrentDocumentAsImage);
 controls.helpButton.addEventListener('click', openHelp);
 controls.wysiwygMode.addEventListener('click', () => changeModeFromControl('wysiwyg'));
 controls.markdownMode.addEventListener('click', () => changeModeFromControl('markdown'));
@@ -2376,6 +2625,34 @@ findReplaceElements.replaceAllButton.addEventListener('click', () => {
   });
 });
 findReplaceElements.closeButton.addEventListener('click', () => closeFindReplace());
+goToLineElements.form.addEventListener('submit', (event) => {
+  event.preventDefault();
+  submitGoToLine();
+});
+goToLineElements.input.addEventListener('input', () => setGoToLineError());
+goToLineElements.closeButton.addEventListener('click', () => closeGoToLine());
+goToLineElements.cancelButton.addEventListener('click', () => closeGoToLine());
+goToLineElements.dialog.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeGoToLine();
+  }
+});
+goToLineElements.dialog.addEventListener('click', (event) => {
+  if (event.target === goToLineElements.dialog) {
+    closeGoToLine();
+  }
+});
+goToLineElements.dialog.addEventListener('close', () => {
+  const returnFocus = goToLineReturnFocus;
+  const shouldRestoreFocus = restoreGoToLineFocusOnClose;
+  goToLineReturnFocus = null;
+  restoreGoToLineFocusOnClose = true;
+
+  if (shouldRestoreFocus && returnFocus instanceof HTMLElement && returnFocus.isConnected) {
+    returnFocus.focus({ preventScroll: true });
+  }
+});
 helpElements.closeButton.addEventListener('click', closeHelp);
 helpElements.dialog.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
@@ -2412,7 +2689,7 @@ themeSelect.addEventListener('change', () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (helpElements.dialog.open) {
+  if (helpElements.dialog.open || goToLineElements.dialog.open) {
     return;
   }
 
@@ -2434,6 +2711,7 @@ document.addEventListener('keydown', (event) => {
     o: 'open',
     s: event.shiftKey ? 'save-as' : 'save',
     f: 'find',
+    g: 'go-to-line',
     '1': 'wysiwyg',
     '2': 'markdown',
     '3': 'reader'

@@ -12,7 +12,9 @@ function functionSource(name, nextMarker) {
 
 test('opening and closing find and replace never changes the current mode', () => {
   const openSource = functionSource('openFindReplace', 'closeFindReplace');
-  const closeSource = functionSource('closeFindReplace', 'openHelp');
+  const closeSource = rendererSource.match(
+    /function closeFindReplace\([^]*?(?=\nlet goToLineReturnFocus)/
+  )?.[0] || '';
 
   assert.doesNotMatch(openSource, /setMode|changeMode/);
   assert.doesNotMatch(closeSource, /setMode|changeMode|returnMode/);

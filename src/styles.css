@@ -548,6 +548,182 @@ html.android-runtime .mobile-document-meta {
   opacity: 0.5;
 }
 
+.go-to-line-dialog {
+  width: min(380px, calc(100vw - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font: inherit;
+}
+
+.go-to-line-dialog:not([open]) {
+  display: none;
+}
+
+.go-to-line-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.go-to-line-form {
+  display: grid;
+}
+
+.go-to-line-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+
+.go-to-line-header h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 17px;
+}
+
+.go-to-line-close {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.go-to-line-content {
+  display: grid;
+  gap: 7px;
+  padding: 15px;
+}
+
+.go-to-line-summary,
+#goToLineError {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.go-to-line-summary {
+  color: var(--muted);
+}
+
+.go-to-line-content label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+#goToLineInput {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  outline: none;
+  background: var(--surface-deep);
+  color: var(--text);
+  font: inherit;
+}
+
+#goToLineInput:focus {
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 2px var(--active-bg);
+}
+
+#goToLineInput[aria-invalid="true"] {
+  border-color: #c83b3b;
+}
+
+#goToLineError {
+  color: #c83b3b;
+}
+
+.go-to-line-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 0 15px 15px;
+}
+
+.go-to-line-actions button {
+  min-width: 72px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--button-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.go-to-line-actions button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.go-to-line-close:focus-visible,
+.go-to-line-actions button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.image-export-stage {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  display: block;
+  width: 1200px;
+  height: auto;
+  overflow: visible;
+  border: 0;
+  background: var(--surface);
+  pointer-events: none;
+}
+
+.image-export-viewport {
+  position: relative;
+  width: 1200px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.image-export-content.toastui-editor-contents {
+  box-sizing: border-box;
+  width: 1200px;
+  max-width: none;
+  margin: 0;
+  padding: 56px 72px;
+  transform-origin: top left;
+}
+
+.image-export-remote-image {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: center;
+  margin: 1em 0;
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--surface-deep);
+  text-align: center;
+}
+
 .help-dialog {
   width: min(720px, calc(100vw - 32px));
   max-width: none;
@@ -1814,10 +1990,10 @@ select {
     display: grid;
     grid-column: 1 / -1;
     grid-row: 2;
-    grid-template-columns: repeat(5, minmax(44px, 64px));
+    grid-template-columns: repeat(7, minmax(40px, 58px));
     justify-content: center;
     width: 100%;
-    gap: 6px;
+    gap: 4px;
     margin: 0;
   }
 
@@ -2053,6 +2229,20 @@ select {
 }
 
 @media (max-width: 700px) {
+  .go-to-line-dialog {
+    width: calc(100vw - 16px);
+  }
+
+  .go-to-line-close,
+  .go-to-line-actions button {
+    min-height: 44px;
+  }
+
+  .go-to-line-close {
+    width: 44px;
+    height: 44px;
+  }
+
   .help-dialog {
     width: calc(100vw - 16px);
     border-radius: 10px;

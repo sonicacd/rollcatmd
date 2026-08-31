@@ -1,6 +1,6 @@
 {
   "name": "rollcat-md",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "rollcat-md — a lightweight Markdown reader and editor for Windows and Android.",
   "author": "sonicacd",
   "license": "Apache-2.0",
@@ -38,7 +38,9 @@
     "@tauri-apps/plugin-dialog": "2.7.1",
     "@tauri-apps/plugin-fs": "2.5.1",
     "@toast-ui/editor": "3.2.2",
-    "dompurify": "3.4.12"
+    "dompurify": "3.4.12",
+    "fflate": "^0.8.3",
+    "html-to-image": "^1.11.13"
   },
   "overrides": {
     "dompurify": "3.4.12"

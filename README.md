@@ -39,7 +39,8 @@ Android 版使用系统文件选择器，不申请整盘存储权限。从系统
 1. 点击“新建”创建文档，点击“打开”选择已有文件，或把支持的文件直接拖进窗口。
 2. 在“所见即所得”“源码”“阅读”三种视图之间切换。
 3. 编辑完成后点击“保存”；需要保留原文件时使用“另存为”。
-4. 从“主题”菜单选择纯黑、纯白或护眼主题。
+4. 点击“图片”把当前文档导出为 PNG 图片。
+5. 从“主题”菜单选择纯黑、纯白或护眼主题。
 
 当前文件名显示在 Windows 窗口标题栏或 Android 顶部应用栏中。名称后出现圆点或标题末尾出现 `*` 时，表示文档还有未保存的修改。界面同时显示当前文档的字符数和 LLM token 估算值。
 
@@ -52,6 +53,18 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 - **阅读**：只显示渲染后的内容，适合专注阅读。
 
 所见即所得、阅读及大文档轻量预览使用一致的 Obsidian 风格正文节奏：16px 正文、1.5 倍行高和清晰段距。排版内容宽度会随窗口自适应，宽屏下最大为 1200px。
+
+### 跳转到行与导出图片
+
+点击工具栏“跳转”或按 `Ctrl+G`，输入行号后即可定位到当前文档的对应行。普通文档从所见即所得或阅读模式跳转时会切换到源码模式，以保证行号精确。
+
+点击工具栏“图片”可导出当前文档：
+
+- 内容能放入一页时，保存为单个 PNG 图片。
+- 渲染内容不超过 12 页时，自动生成分页 PNG，并打包为一个 ZIP 文件。
+- 超过 12 页或达到 **2.5 MiB（2,621,440 字节）** 的文档按带行号的 Markdown 源码分页导出，避免反复排版全文或创建超大画布。
+- 如果预计超过 2,000 页或分页图片累计超过 128 MiB，导出会停止并提示拆分文档，避免耗尽内存。
+- 网络图片受跨域安全限制，导出时会以图片的替代文字占位，不会静默生成空白区域。
 
 ### 支持的 Markdown 格式
 
@@ -125,6 +138,7 @@ Windows 版也可以把支持的文件直接拖进程序窗口打开。单文件
 | 源码 | `Ctrl+2` |
 | 阅读 | `Ctrl+3` |
 | 查找和替换 | `Ctrl+F` |
+| 跳转到行 | `Ctrl+G` |
 
 ### 保存与数据安全
 
@@ -200,7 +214,8 @@ Local builds require Android SDK 36, the NDK, a JDK, and the Rust Android target
 1. Select **New** to create a document, choose **Open**, or drag a supported file directly onto the Windows app.
 2. Switch between **WYSIWYG**, **Source**, and **Reader** views.
 3. Select **Save** after editing, or **Save As** to keep the original file unchanged.
-4. Choose Black, White, or Eye Comfort from the Theme menu.
+4. Select **Image** to export the current document as PNG images.
+5. Choose Black, White, or Eye Comfort from the Theme menu.
 
 The current filename appears in the Windows title bar or the Android app bar. A trailing `*` or a dot beside the Android filename means that the document has unsaved changes. The interface also shows a live character count and an estimated LLM token count.
 
@@ -213,6 +228,18 @@ Tokens are displayed as “approximately N tokens.” This is a fast, model-inde
 - **Reader**: display only the rendered document.
 
 WYSIWYG, Reader, and large-document lightweight preview share an Obsidian-inspired reading rhythm: 16px body text, 1.5 line height, and clear paragraph spacing. Rendered content adapts to the window and is capped at 1200px on wide screens.
+
+### Go to Line and Image Export
+
+Select **Go to Line** on the toolbar or press `Ctrl+G`, then enter a line number to move to that line in the current document. Jumping from WYSIWYG or Reader switches a regular document to Source mode so the line number stays exact.
+
+Select **Image** on the toolbar to export the current document:
+
+- Content that fits on one page is saved as a single PNG image.
+- Rendered content up to 12 pages is split into paginated PNG images and packaged in one ZIP file.
+- Documents over 12 pages or at least **2.5 MiB (2,621,440 bytes)** are exported as paginated Markdown source with line numbers, avoiding repeated full-document layout and oversized canvases.
+- Export stops with a prompt to split the document if it would exceed 2,000 pages or 128 MiB of paginated images, preventing memory exhaustion.
+- Remote images are represented by their alternative text during export because of cross-origin security restrictions, rather than being silently omitted.
 
 ### Markdown Support
 
@@ -286,6 +313,7 @@ Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-1
 | Source view | `Ctrl+2` |
 | Reader view | `Ctrl+3` |
 | Find and replace | `Ctrl+F` |
+| Go to line | `Ctrl+G` |
 
 ### Saving and Data Safety
 
