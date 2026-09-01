@@ -39,7 +39,7 @@ Android 版使用系统文件选择器，不申请整盘存储权限。从系统
 1. 点击“新建”创建文档，点击“打开”选择已有文件，或把支持的文件直接拖进窗口。
 2. 在“所见即所得”“源码”“阅读”三种视图之间切换。
 3. 编辑完成后点击“保存”；需要保留原文件时使用“另存为”。
-4. 点击“图片”把当前文档导出为 PNG 图片。
+4. 点击“图片”导出当前文档：一页保存为 PNG，多页打包为 ZIP。
 5. 从“主题”菜单选择纯黑、纯白或护眼主题。
 
 当前文件名显示在 Windows 窗口标题栏或 Android 顶部应用栏中。名称后出现圆点或标题末尾出现 `*` 时，表示文档还有未保存的修改。界面同时显示当前文档的字符数和 LLM token 估算值。
@@ -60,11 +60,11 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 
 点击工具栏“图片”可导出当前文档：
 
-- 点击后会先显示确认弹窗；选择“开始导出”后，同一弹窗会显示解析、下载网络图片、排版、生成、打包和保存进度。生成期间可随时取消，取消后不会写入目标文件。
+- 点击后会先显示确认弹窗；选择“开始导出”后，同一弹窗会显示解析、下载网络图片、排版、生成、打包和保存进度。解析、下载、排版、生成和打包期间可以取消；开始写入最终文件后取消按钮暂不可用。取消成功不会生成或覆盖目标文件。
 - 每张 PNG 宽 1440px、高度最多约 4072px（约两张竖版 A4）；内容不足时会按实际高度裁短。一页直接保存为 PNG，多页使用固定四位编号（如 `小说-0001.png`）并打包为 ZIP。
 - 超长文档按块保持阅读视图的 Markdown 排版，不再退化为带行号的源码图片；每批内容及其临时排版元素在生成后立即释放。
 - Windows 和 Android 原生版把多页图片流式写入临时 ZIP，最多导出 2,000 页；浏览器版仍在内存中生成 ZIP，累计达到 128 MiB 时会停止并提示拆分文档。
-- 导出可包含公网 HTTPS 地址的 PNG、JPEG、GIF 和 WebP 图片。每次导出对地址去重，使用 3 路并发；单图限 10 秒和 8 MiB，最多 32 个唯一地址、合计 32 MiB。浏览器版仍受图片服务器的 CORS 策略限制；下载失败或不支持的图片会保留替代文字占位，并在完成时汇总数量。相对本地图片路径暂不支持。
+- Windows 和 Android 原生版会下载并嵌入公网 HTTPS 地址的 PNG、JPEG、GIF 和 WebP 图片；v0.3.4 修复了下载成功的网络图片在导出结果中可能显示为空白的问题。每次导出对地址去重，使用 3 路并发；单图限 10 秒和 8 MiB，最多 32 个唯一地址、合计 32 MiB。浏览器版仍受图片服务器的 CORS 策略限制；下载失败或不支持的图片会保留替代文字占位，并在完成时汇总数量。相对本地图片路径暂不支持。
 
 ### 支持的 Markdown 格式
 
@@ -179,6 +179,10 @@ Windows 版也可以把支持的文件直接拖进程序窗口打开。单文件
 
 当前版本尚未开放对 Markdown 相对本地图片路径的读取。网络图片链接通常可以正常显示。
 
+**为什么导出的网络图片是大片空白？**
+
+这是 v0.3.3 的已知问题，已从 v0.3.4 起修复。请从 GitHub Releases 下载最新版本；浏览器版如果受到图片服务器 CORS 限制，会显示带说明的占位而不是静默留白。
+
 **怎样把滚猫md设为 Markdown 的默认打开程序？**
 
 在 Windows 中右键 Markdown 文件，选择“打开方式 → 选择其他应用 → 在电脑上选择应用”，找到 `rollcat-md.exe`，然后设为默认应用。
@@ -214,7 +218,7 @@ Local builds require Android SDK 36, the NDK, a JDK, and the Rust Android target
 1. Select **New** to create a document, choose **Open**, or drag a supported file directly onto the Windows app.
 2. Switch between **WYSIWYG**, **Source**, and **Reader** views.
 3. Select **Save** after editing, or **Save As** to keep the original file unchanged.
-4. Select **Image** to export the current document as PNG images.
+4. Select **Image** to export the current document as one PNG or a multi-page ZIP.
 5. Choose Black, White, or Eye Comfort from the Theme menu.
 
 The current filename appears in the Windows title bar or the Android app bar. A trailing `*` or a dot beside the Android filename means that the document has unsaved changes. The interface also shows a live character count and an estimated LLM token count.
@@ -235,11 +239,11 @@ Select **Go to Line** on the toolbar or press `Ctrl+G`, then enter a line number
 
 Select **Image** on the toolbar to export the current document:
 
-- Selecting **Image** first opens a confirmation dialog. After **Start Export** is selected, the same dialog shows progress for parsing, downloading remote images, layout, rendering, packaging, and saving. The operation can be cancelled while content is being generated, without writing the destination file.
+- Selecting **Image** first opens a confirmation dialog. After **Start Export** is selected, the same dialog shows progress for parsing, downloading remote images, layout, rendering, packaging, and saving. Cancellation is available through parsing, downloading, layout, rendering, and packaging. It is disabled while the final file is being written; a successful cancellation does not create or replace the destination file.
 - Each PNG is 1440px wide and up to approximately 4072px high (about two portrait A4 pages); shorter content is cropped to its actual height. One page is saved directly as PNG, while multiple pages use fixed four-digit names such as `novel-0001.png` and are packaged as ZIP.
 - Very long documents are laid out in chunks while preserving the Reader-style Markdown presentation. They no longer fall back to source-code images with line numbers, and each chunk's temporary layout is released after it is rendered.
 - Native Windows and Android builds stream multi-page output into a temporary ZIP and allow up to 2,000 pages. The browser build still creates ZIP files in memory and stops at a cumulative 128 MiB with a prompt to split the document.
-- Export can include PNG, JPEG, GIF, and WebP images from public HTTPS URLs. Each export deduplicates URLs and uses three concurrent downloads, with limits of 10 seconds and 8 MiB per image, 32 unique URLs, and 32 MiB in total. Browser exports remain subject to the image server's CORS policy; failed or unsupported images keep a visible alt-text placeholder and are counted in the completion summary. Relative local image paths are not supported yet.
+- Native Windows and Android builds download and embed PNG, JPEG, GIF, and WebP images from public HTTPS URLs. v0.3.4 fixed an issue that could leave successfully downloaded remote images blank in exported files. Each export deduplicates URLs and uses three concurrent downloads, with limits of 10 seconds and 8 MiB per image, 32 unique URLs, and 32 MiB in total. Browser exports remain subject to the image server's CORS policy; failed or unsupported images keep a visible alt-text placeholder and are counted in the completion summary. Relative local image paths are not supported yet.
 
 ### Markdown Support
 
@@ -353,6 +357,10 @@ Check that its extension is supported and that it contains valid UTF-8 text. Con
 **Why is a local image missing?**
 
 Relative local image paths are not supported in the current version. Remote image URLs normally work.
+
+**Why is a remote image blank in an exported file?**
+
+This was a known issue in v0.3.3 and is fixed in v0.3.4 and later. Download the latest release. In the browser build, a remote image blocked by the server's CORS policy is shown as a labelled placeholder instead of a silent blank area.
 
 **How do I make rollcat-md the default Markdown application?**
 
