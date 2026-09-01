@@ -2660,7 +2660,7 @@ dependencies = [
 
 [[package]]
 name = "rollcat-md"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "serde",
  "tauri",
