@@ -71,6 +71,7 @@ import {
 } from './find-replace.js';
 import { registerNativeFileDrop } from './file-drop.js';
 import { countTextLines, parseLineNumber } from './go-to-line.js';
+import { captureViewPosition, createViewPositionController } from './view-position.js';
 import { imageDataToUint8Array, imageExportBaseName } from './image-export.js';
 import {
   renderMarkdownAsImages,
@@ -537,6 +538,8 @@ const editor = new Editor({
     ['code', 'codeblock']
   ]
 });
+
+const viewPosition = createViewPositionController();
 
 let viewer = Editor.factory({
   el: viewerElement,
@@ -1634,6 +1637,7 @@ function setDocument(
     originalSerializedContent = null
   } = {}
 ) {
+  viewPosition.cancel();
   closeFindReplace({ restoreMode: false, restoreFocus: false });
   const content = normalizeEditorText(markdown || '');
   const measuredSize = Number.isFinite(byteSize) ? byteSize : utf8ByteLength(content);
@@ -2662,6 +2666,7 @@ function closeGoToLine({ restoreFocus = true } = {}) {
 }
 
 function jumpToLine(line) {
+  viewPosition.cancel();
   lastRequestedLine = line;
 
   if (state.isLargeDocument) {
@@ -2731,8 +2736,24 @@ function closeHelp() {
 }
 
 function changeModeFromControl(mode) {
+  if (mode === state.mode) return;
+  viewPosition.cancel();
+  const position = state.isLargeDocument
+    ? largeFileEditor.scrollSnapshot()
+    : captureViewPosition(...getCurrentViewElements());
   closeFindReplace({ restoreFocus: false });
   setMode(mode);
+  if (state.isLargeDocument) {
+    largeFileEditor.dispatch({ effects: position });
+  } else {
+    viewPosition.restore(position, ...getCurrentViewElements());
+  }
+}
+
+function getCurrentViewElements() {
+  if (state.mode === 'reader') return [viewerElement, readerPanel];
+  const root = state.mode === 'markdown' ? editor.mdEditor.view.dom : editor.wwEditor.view.dom;
+  return [root, root];
 }
 
 function setMode(mode) {
@@ -2760,7 +2781,8 @@ function setMode(mode) {
     const releaseSuppression = beginSuppressChanges();
     showEditorPanel();
     editor.changeMode(mode);
-    editor.focus();
+    const [root] = getCurrentViewElements();
+    root.focus({ preventScroll: true });
     releaseSuppression();
   }
 
