@@ -192,7 +192,9 @@ export function inspectRemoteImageUrl(value) {
 }
 
 function imageSource(image) {
-  return image.currentSrc || image.getAttribute?.('src') || image.src || '';
+  // An export clone may have just received a local blob URL while currentSrc
+  // still refers to the previous page-relative URL until the next layout.
+  return image.getAttribute?.('src') || image.currentSrc || image.src || '';
 }
 
 function replaceWithPlaceholder(image) {

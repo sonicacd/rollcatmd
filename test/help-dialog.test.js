@@ -6,10 +6,10 @@ const pageHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
 const rendererSource = readFileSync(new URL('../src/renderer.js', import.meta.url), 'utf8');
 
-test('places an accessible Help button after Save As and connects it to a dialog', () => {
+test('places accessible Help in the more menu and connects it to a dialog', () => {
   assert.match(
     pageHtml,
-    /id="saveAsButton"[\s\S]*?id="helpButton"[^>]*aria-haspopup="dialog"[^>]*aria-controls="helpDialog"[^>]*>帮助<\/button>/
+    /id="moreMenu"[\s\S]*?id="helpButton"[^>]*aria-haspopup="dialog"[^>]*aria-controls="helpDialog"[^>]*><span>使用帮助<\/span><\/button>/
   );
   assert.match(
     pageHtml,
@@ -43,11 +43,11 @@ test('Help uses theme-aware modal styling and a touch-friendly responsive layout
   );
 });
 
-test('the seven-button toolbar fits one mobile row', () => {
+test('frequent actions fit one mobile row while the more menu retains lower-frequency commands', () => {
   assert.match(styles, /\.toolbar\s*\{[\s\S]*?flex:\s*0 0 auto;/);
   assert.match(
     styles,
-    /@media \(max-width:\s*820px\)[\s\S]*?\.toolbar\s*\{[\s\S]*?grid-template-columns:\s*repeat\(7, minmax\(40px, 58px\)\);/
+    /@media \(max-width:\s*820px\)[\s\S]*?\.toolbar\s*\{[\s\S]*?grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\);/
   );
 });
 

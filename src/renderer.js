@@ -82,6 +82,9 @@ import { createNativeArchiveTemp } from './image-export-file.js';
 import { createImagePageCollector } from './image-page-collector.js';
 import { throwIfAborted } from './markdown-export-chunks.js';
 import { inlineRemoteImages } from './remote-image-export.js';
+import { createWorkspaceController } from './workspace-controller.js';
+import { calloutEditorPlugin } from './editor-callouts.js';
+import { captureSelectedContent, renderSelectedImage } from './selection-image.js';
 import './styles.css';
 
 const initialTheme = applyTheme(readStoredTheme(), { persist: false });
@@ -240,6 +243,7 @@ const controls = {
 };
 
 const state = {
+  draftId: crypto.randomUUID(),
   currentFilePath: null,
   currentFileWritable: false,
   browserFileHandle: null,
@@ -261,6 +265,11 @@ const state = {
     hasBom: false
   }
 };
+
+let workspaceController = null;
+let allowNativeClose = false;
+let imageHydrationTimer;
+let imageHydrationAbort;
 
 const findReplaceState = {
   query: '',
@@ -378,8 +387,8 @@ const largeFileEditorExtensions = [
     '.cm-scroller': {
       overflow: 'auto',
       fontFamily: '"Cascadia Code", "Consolas", "Microsoft YaHei", monospace',
-      fontSize: '14px',
-      lineHeight: '1.5'
+      fontSize: 'var(--source-font-size, 14px)',
+      lineHeight: 'var(--document-line-height, 1.5)'
     },
     '.cm-content': {
       minHeight: '100%',
@@ -391,8 +400,8 @@ const largeFileEditorExtensions = [
     },
     '&.cm-large-preview .cm-scroller': {
       fontFamily: 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Microsoft YaHei", sans-serif',
-      fontSize: '16px',
-      lineHeight: '1.5'
+      fontSize: 'var(--document-font-size, 16px)',
+      lineHeight: 'var(--document-line-height, 1.5)'
     },
     '&.cm-large-preview .cm-gutters': {
       display: 'none'
@@ -530,6 +539,7 @@ const editor = new Editor({
   usageStatistics: false,
   customHTMLSanitizer: sanitizeMarkdownHTML,
   hideModeSwitch: true,
+  plugins: [calloutEditorPlugin],
   toolbarItems: [
     ['heading', 'bold', 'italic', 'strike'],
     ['hr', 'quote'],
@@ -760,7 +770,9 @@ async function openMarkdownFile() {
     return openBrowserFile();
   }
 
-  const selected = await openDialog({
+  const selected = document.documentElement.classList.contains('android-runtime')
+    ? await invoke('open_document_picker')
+    : await openDialog({
     title: '打开 Markdown 文件',
     multiple: false,
     filters: [
@@ -1004,6 +1016,7 @@ async function startImageExport() {
   controls.exportImageButton.disabled = true;
   controls.exportImageButton.setAttribute('aria-busy', 'true');
   const fileName = getDisplayName(state.currentFilePath);
+  const exportDocumentPath = state.currentFilePath;
   let nativeArchive = null;
   let archiveCollector = null;
   let archiveFinished = false;
@@ -1044,7 +1057,7 @@ async function startImageExport() {
           length: documentText.length
         },
         renderChunk: renderImageExportChunk,
-        inlineImages: inlineRemoteImages,
+        inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath: exportDocumentPath }),
         signal: abortController.signal,
         onProgress: reportProgress,
         onPage: archiveCollector ? (blob) => archiveCollector.add(blob) : undefined
@@ -1098,7 +1111,7 @@ async function startImageExport() {
           length: markdown.length
         },
         renderChunk: renderImageExportChunk,
-        inlineImages: inlineRemoteImages,
+        inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath: exportDocumentPath }),
         signal: abortController.signal,
         onProgress: reportProgress,
         onPage: archiveCollector ? (blob) => archiveCollector.add(blob) : undefined
@@ -1161,7 +1174,7 @@ async function startImageExport() {
     }
 
     const imageWarning = output.failedImages > 0
-      ? `，${output.failedImages.toLocaleString()} 张网络图片未包含`
+      ? `，${output.failedImages.toLocaleString()} 张图片未包含`
       : '';
     const action = result.download ? '已请求下载' : '已导出';
     setStatus(output.pageCount > 1
@@ -1247,7 +1260,7 @@ async function openExternalFileUrls(urls) {
   }
   lastExternalOpen = { uri: filePath, time: now };
 
-  if (!confirmDiscardChanges()) {
+  if (!await confirmDiscardChanges()) {
     setStatus('已取消打开外部文件');
     return false;
   }
@@ -1302,7 +1315,7 @@ async function initializeNativeFileOpenHandling() {
 }
 
 async function openDroppedFile(filePath) {
-  if (!confirmDiscardChanges()) {
+  if (!await confirmDiscardChanges()) {
     setStatus('已取消打开拖入文件');
     return false;
   }
@@ -1428,6 +1441,8 @@ function noteDocumentChanged(documentByteSize = null) {
   state.documentByteSize = documentByteSize;
   setDirty(state.revision !== state.savedRevision);
   scheduleCountsUpdate();
+  workspaceController?.changed();
+  scheduleImageHydration();
 }
 
 function updateSavingState() {
@@ -1446,8 +1461,8 @@ function updateCounts() {
     state.documentByteSize = byteSize;
     const tokenEstimate = estimateLlmTokensFromByteLength(byteSize);
 
-    countText.textContent =
-      `${documentText.length.toLocaleString()} 字符 / 约 ${tokenEstimate.toLocaleString()} tokens`;
+    countText.textContent = `${documentText.length.toLocaleString()} 字符${workspaceController?.preferences.showTokens ? ` / 约 ${tokenEstimate.toLocaleString()} tokens` : ''}`;
+    countText.title = `${documentText.length.toLocaleString()} 字符 / 约 ${tokenEstimate.toLocaleString()} tokens（通用估算）`;
     return;
   }
 
@@ -1455,8 +1470,8 @@ function updateCounts() {
   const tokenEstimate = estimateLlmTokensFromByteLength(
     utf8ByteLength(text)
   );
-  countText.textContent =
-    `${text.length.toLocaleString()} 字符 / 约 ${tokenEstimate.toLocaleString()} tokens`;
+  countText.textContent = `${text.length.toLocaleString()} 字符${workspaceController?.preferences.showTokens ? ` / 约 ${tokenEstimate.toLocaleString()} tokens` : ''}`;
+  countText.title = `${text.length.toLocaleString()} 字符 / 约 ${tokenEstimate.toLocaleString()} tokens（通用估算）`;
 }
 
 let countUpdateTimer = null;
@@ -1570,6 +1585,7 @@ function enhanceRenderedMarkdown(root) {
       }
     }
   });
+  enhanceCodeBlocks(root);
 }
 
 function refreshReader() {
@@ -1583,6 +1599,7 @@ function refreshReader() {
     customHTMLSanitizer: sanitizeMarkdownHTML
   });
   enhanceRenderedMarkdown(viewerElement);
+  scheduleImageHydration();
 }
 
 function setDirty(isDirty) {
@@ -1637,6 +1654,8 @@ function setDocument(
     originalSerializedContent = null
   } = {}
 ) {
+  workspaceController?.beforeDocumentChange();
+  imageHydrationAbort?.abort();
   viewPosition.cancel();
   closeFindReplace({ restoreMode: false, restoreFocus: false });
   const content = normalizeEditorText(markdown || '');
@@ -1644,6 +1663,7 @@ function setDocument(
   const isLargeDocument = shouldUseLargeDocumentMode(measuredSize, content.length);
 
   state.documentId += 1;
+  state.draftId = crypto.randomUUID();
   state.revision = 0;
   state.savedRevision = 0;
   state.currentFilePath = filePath;
@@ -1683,6 +1703,8 @@ function setDocument(
   }
 
   setDirty(false);
+  scheduleImageHydration();
+  void workspaceController?.rebuildOutline();
   return isLargeDocument;
 }
 
@@ -1705,18 +1727,19 @@ function openDocument({
   });
 
   setStatus(`已打开 ${getDisplayName(filePath)}`);
+  void workspaceController?.documentOpened();
 }
 
-function confirmDiscardChanges() {
+async function confirmDiscardChanges() {
   if (!state.isDirty) {
     return true;
   }
 
-  return window.confirm('当前文件还没有保存。继续操作会丢失这些更改，确定继续吗？');
+  return workspaceController ? workspaceController.askToLeave() : false;
 }
 
 async function newFile() {
-  if (!confirmDiscardChanges()) {
+  if (!await confirmDiscardChanges()) {
     return;
   }
 
@@ -1726,7 +1749,7 @@ async function newFile() {
 }
 
 async function openFile() {
-  if (!confirmDiscardChanges()) {
+  if (!await confirmDiscardChanges()) {
     return;
   }
 
@@ -1810,6 +1833,8 @@ async function performSave(saveAs, snapshot) {
       : materialized.serializedContent;
     const hasNewerChanges = !matchesDocumentRevision(snapshot, state);
     setDirty(hasNewerChanges);
+    workspaceController?.saved(snapshot);
+    scheduleImageHydration();
     setStatus(hasNewerChanges
       ? `已保存 ${getDisplayName(result.filePath)} 的较早版本，仍有未保存更改`
       : `已保存 ${getDisplayName(result.filePath)}`);
@@ -1833,6 +1858,7 @@ function captureSaveSnapshot() {
   const textFormat = { ...state.textFormat };
 
   return {
+    draftId: state.draftId,
     documentId: state.documentId,
     revision: state.revision,
     filePath: state.currentFilePath,
@@ -2760,6 +2786,8 @@ function setMode(mode) {
   state.mode = mode;
   markMobileReaderScrollProgrammatic();
   dispatchMobileChrome({ type: 'mode-change', mode });
+  workspaceController?.modeChanged();
+  scheduleImageHydration();
 
   if (state.isLargeDocument) {
     showEditorPanel();
@@ -2925,12 +2953,13 @@ themeSelect.addEventListener('change', () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (helpElements.dialog.open || goToLineElements.dialog.open || imageExportDialog.state !== 'closed') {
+  if (document.querySelector('dialog[open]') || imageExportDialog.state !== 'closed') {
     return;
   }
 
   if (event.key === 'Escape' && isFindReplaceOpen()) {
     event.preventDefault();
+    event.stopImmediatePropagation();
     closeFindReplace();
     return;
   }
@@ -2960,22 +2989,274 @@ document.addEventListener('keydown', (event) => {
   }
 
   event.preventDefault();
+  event.stopImmediatePropagation();
 
   if (event.repeat) {
     return;
   }
 
   runAction(action);
-});
+}, true);
 
 window.addEventListener('beforeunload', (event) => {
-  if (!state.isDirty) {
+  if (!state.isDirty || allowNativeClose) {
     return;
   }
 
   event.preventDefault();
   event.returnValue = false;
 });
+
+function currentLineSource() {
+  if (state.isLargeDocument) {
+    const text = largeFileEditor.state.doc;
+    return { lineCount: text.lines, getLine: (number) => text.line(number).text };
+  }
+  const lines = getCurrentMarkdown().split('\n');
+  return { lineCount: lines.length, getLine: (number) => lines[number - 1] };
+}
+
+function captureDocumentPosition() {
+  if (!state.isLargeDocument) return captureViewPosition(...getCurrentViewElements());
+  const view = largeFileEditor;
+  const maximum = view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight;
+  const block = view.lineBlockAtHeight(view.scrollDOM.scrollTop);
+  return { large: true, offset: block.from, scrollRatio: maximum > 0 ? view.scrollDOM.scrollTop / maximum : 0 };
+}
+
+function restoreDocumentPosition(mode, position) {
+  if (mode !== state.mode) setMode(mode);
+  if (!position) return;
+  markMobileReaderScrollProgrammatic(1200);
+  if (state.isLargeDocument) {
+    const view = largeFileEditor;
+    const id = state.documentId;
+    const offset = Math.min(view.state.doc.length, Math.max(0, Number(position.offset) || 0));
+    requestAnimationFrame(() => {
+      if (state.documentId !== id) return;
+      if (position.scrollRatio >= 0.999) view.scrollDOM.scrollTop = view.scrollDOM.scrollHeight;
+      else view.dispatch({ effects: EditorView.scrollIntoView(offset, { y: 'start', yMargin: 18 }) });
+    });
+  } else viewPosition.restore(position, ...getCurrentViewElements());
+}
+
+function visibleDocumentLine(headings) {
+  if (state.isLargeDocument) {
+    const block = largeFileEditor.lineBlockAtHeight(largeFileEditor.scrollDOM.scrollTop + 40);
+    return largeFileEditor.state.doc.lineAt(block.from).number;
+  }
+  const [root, scroller] = getCurrentViewElements();
+  const bounds = scroller.getBoundingClientRect();
+  if (state.mode === 'markdown') {
+    const view = editor.mdEditor.view;
+    const hit = view.posAtCoords({ left: bounds.left + 40, top: bounds.top + 45 });
+    return hit ? view.state.doc.resolve(hit.pos).index(0) + 1 : 1;
+  }
+  const nodes = [...root.querySelectorAll('h1,h2,h3,h4,h5,h6')];
+  let index = -1;
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].getBoundingClientRect().top <= bounds.top + 70) index = i;
+    else break;
+  }
+  return headings[Math.max(0, index)]?.line || 1;
+}
+
+function navigateDocumentHeading(heading, index) {
+  if (!heading) return;
+  viewPosition.cancel(); markMobileReaderScrollProgrammatic();
+  if (state.isLargeDocument) {
+    const line = largeFileEditor.state.doc.line(Math.min(heading.line, largeFileEditor.state.doc.lines));
+    largeFileEditor.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 24 }) });
+  } else if (state.mode === 'markdown') {
+    editor.setSelection([heading.line, 1]); editor.focus();
+  } else {
+    const [root, scroller] = getCurrentViewElements();
+    const node = root.querySelectorAll('h1,h2,h3,h4,h5,h6')[index];
+    if (node) scroller.scrollTop += node.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24;
+  }
+  setStatus(heading.title);
+}
+
+async function openRecentDocument(record) {
+  const request = beginOpenRequest();
+  let bytes;
+  if (isTauriRuntime()) {
+    await invoke('authorize_recent_file', { path: record.filePath });
+    bytes = await readFile(record.filePath);
+  } else {
+    const handle = record.browserFileHandle;
+    if (!handle) { await openFile(); return; }
+    let permission = await handle.queryPermission({ mode: 'read' });
+    if (permission !== 'granted') permission = await handle.requestPermission({ mode: 'read' });
+    if (permission !== 'granted') throw new Error('没有获得文件读取权限');
+    bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer());
+  }
+  if (!canApplyOpenRequest(request)) return;
+  openDocument({ filePath: record.filePath, ...decodeOpenedDocument(bytes), byteSize: bytes.byteLength,
+    browserFileHandle: record.browserFileHandle, fileWritable: record.fileWritable && canOverwriteOpenedFile(record.filePath) });
+}
+
+function enhanceCodeBlocks(root) {
+  root.querySelectorAll('pre').forEach((block) => {
+    if (block.querySelector('.code-copy-button')) return;
+    const code = block.querySelector('code');
+    if (!code) return;
+    block.classList.add('code-copy-host');
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'code-copy-button';
+    button.textContent = '复制代码'; button.setAttribute('aria-label', '复制代码');
+    button.addEventListener('click', async () => {
+      try { const { copyText } = await import('./local-images.js'); await copyText(code.textContent, isTauriRuntime() ? { invoke } : {}); button.textContent = '已复制'; setStatus('代码已复制'); }
+      catch (error) { setStatus(`复制失败：${error.message || error}`); }
+      setTimeout(() => { button.textContent = '复制代码'; }, 1800);
+    });
+    block.append(button);
+  });
+}
+
+const imageHydrationReleases = new Map();
+function scheduleImageHydration() {
+  clearTimeout(imageHydrationTimer);
+  imageHydrationTimer = setTimeout(async () => {
+    if (!imageHydrationAbort || imageHydrationAbort.signal.aborted) imageHydrationAbort = new AbortController();
+    const controller = imageHydrationAbort;
+    try {
+      const { hydrateLocalImages } = await import('./local-images.js');
+      const roots = state.isLargeDocument ? [largeFileEditor.dom] : [viewerElement, editor.wwEditor.view.dom, editorElement.querySelector('.toastui-editor-md-preview')].filter(Boolean);
+      for (const [root, entry] of imageHydrationReleases) {
+        if (!roots.includes(root) || entry.documentId !== state.documentId || entry.path !== state.currentFilePath) {
+          entry.release(); imageHydrationReleases.delete(root);
+        }
+      }
+      for (const root of roots) {
+        if (imageHydrationReleases.has(root)) continue;
+        const release = hydrateLocalImages(root, { documentPath: state.currentFilePath, invoke, signal: controller.signal });
+        imageHydrationReleases.set(root, { release, documentId: state.documentId, path: state.currentFilePath });
+      }
+    } catch (error) { if (error.name !== 'AbortError') console.warn('加载本地图片失败', error); }
+  }, 120);
+}
+
+async function inlineDocumentImages(root, { documentPath = state.currentFilePath, ...options } = {}) {
+  const { inlineLocalImages } = await import('./local-images.js');
+  const local = await inlineLocalImages(root, { ...options, documentPath, invoke });
+  try {
+    const remote = await inlineRemoteImages(root, options);
+    return { includedImages: (local.includedImages || 0) + (remote.includedImages || 0),
+      failedImages: (local.failedImages || 0) + (remote.failedImages || 0),
+      release() { local.release?.(); remote.release?.(); } };
+  } catch (error) { local.release?.(); throw error; }
+}
+
+let selectedImageContent = null;
+function rememberImageSelection() {
+  let selection;
+  if (state.isLargeDocument || state.mode === 'markdown') {
+    const text = state.isLargeDocument
+      ? largeFileEditor.state.doc.sliceString(largeFileEditor.state.selection.main.from, largeFileEditor.state.selection.main.to)
+      : editor.getSelectedText();
+    if (text) selection = { markdown: text };
+  } else selection = captureSelectedContent(getCurrentViewElements()[0]);
+  if (selection) selectedImageContent = { ...selection, documentId: state.documentId, revision: state.revision };
+}
+
+async function copySelectedImage() {
+  rememberImageSelection();
+  const selection = selectedImageContent;
+  if (!selection || selection.documentId !== state.documentId || selection.revision !== state.revision) {
+    setStatus('请先在文档中选中要复制的段落、表格或代码。'); return;
+  }
+  const button = document.getElementById('copySelectionImageButton'); button.disabled = true;
+  const documentPath = state.currentFilePath;
+  try {
+    setStatus('正在生成选区图片…');
+    const { blob, failedImages } = await renderSelectedImage({ ...selection,
+      renderMarkdown: renderImageExportChunk, inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath }) });
+    try {
+      const { copyImageBlob } = await import('./local-images.js'); await copyImageBlob(blob, isTauriRuntime() ? { invoke } : {});
+      setStatus(`选区图片已复制${failedImages ? `，${failedImages} 张图片未包含` : ''}`);
+    } catch {
+      setStatus('当前环境无法写入图片剪贴板，请保存 PNG。');
+      const result = await saveImageExport(`${imageExportBaseName(getDisplayName(documentPath))}-选区.png`, blob);
+      if (!result.canceled) setStatus('已保存选区图片');
+    }
+  } catch (error) { setStatus(`生成选区图片失败：${error.message || error}`); }
+  finally { button.disabled = false; }
+}
+
+async function insertDocumentImage(blob) {
+  if (state.mode === 'reader') { setStatus('请切换到编辑或源码视图后插入图片。'); return; }
+  if (!state.currentFilePath || !isTauriRuntime()) {
+    if (!isTauriRuntime()) { setStatus('本地附件需要 Windows 或 Android 版，请在原生应用中插入图片。'); return; }
+    await saveFile(false);
+    if (!state.currentFilePath) return;
+  }
+  const context = { documentId: state.documentId, revision: state.revision, filePath: state.currentFilePath };
+  const { persistDocumentImage } = await import('./local-images.js');
+  const relativePath = await persistDocumentImage(blob, { documentPath: context.filePath, invoke });
+  if (state.documentId !== context.documentId || state.revision !== context.revision) { setStatus(`图片已保存到 ${relativePath}，文档已变化，请从附件目录重新插入。`); return; }
+  const markdown = `![图片](${relativePath})`;
+  if (state.isLargeDocument) {
+    largeFileEditor.dispatch(largeFileEditor.state.replaceSelection(markdown)); largeFileEditor.focus();
+  } else if (state.mode === 'markdown') { editor.replaceSelection(markdown); editor.focus(); }
+  else { editor.exec('addImage', { imageUrl: relativePath, altText: '图片' }); editor.focus(); }
+  scheduleImageHydration(); setStatus('图片已保存到附件目录并插入');
+}
+
+function chooseDocumentImage() {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  input.onchange = () => { if (input.files[0]) void insertDocumentImage(input.files[0]).catch((error) => setStatus(`插入图片失败：${error.message || error}`)); };
+  input.click();
+}
+
+workspaceController = createWorkspaceController({
+  context: () => ({ ...state, filePath: state.currentFilePath, fileWritable: state.currentFileWritable, name: getDisplayName(state.currentFilePath) }),
+  markdown: getCurrentMarkdown, lineSource: currentLineSource, status: setStatus, save: () => saveFile(false),
+  capturePosition: captureDocumentPosition, restorePosition: restoreDocumentPosition,
+  visibleLine: visibleDocumentLine, navigateHeading: navigateDocumentHeading, openRecent: openRecentDocument,
+  restoreDraft(record) {
+    setDocument(record.content, record.filePath, undefined, { ...record.textFormat, fileWritable: false });
+    state.draftId = record.id; state.revision = 1; state.savedRevision = 0; setDirty(true);
+    restoreDocumentPosition(record.mode || 'wysiwyg', record.position); workspaceController.changed();
+  },
+  preferencesChanged(_preferences, position) { updateCounts(); largeFileEditor.requestMeasure(); restoreDocumentPosition(state.mode, position); },
+  rememberNative: (path) => isTauriRuntime() ? invoke('remember_recent_file', { path }) : undefined,
+  forgetNative: (path) => isTauriRuntime() ? invoke('forget_recent_file', { path }) : undefined,
+  clearNative: () => isTauriRuntime() ? invoke('clear_recent_files') : undefined
+});
+workspaceController.init();
+document.getElementById('findButton').addEventListener('click', openFindReplace);
+document.getElementById('insertImageButton').addEventListener('click', chooseDocumentImage);
+document.getElementById('copySelectionImageButton').addEventListener('pointerdown', rememberImageSelection);
+document.getElementById('copySelectionImageButton').addEventListener('click', copySelectedImage);
+document.addEventListener('selectionchange', rememberImageSelection);
+document.addEventListener('markdown-media-visible', scheduleImageHydration);
+document.addEventListener('paste', (event) => {
+  if (!editorPanel.contains(event.target) || state.mode === 'reader') return;
+  const image = [...(event.clipboardData?.items || [])].find((item) => item.type.startsWith('image/'))?.getAsFile();
+  if (!image) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  void insertDocumentImage(image).catch((error) => setStatus(`粘贴图片失败：${error.message || error}`));
+}, true);
+if (document.documentElement.classList.contains('android-runtime')) {
+  const folderButton = document.getElementById('linkImageFolderButton'); folderButton.hidden = false;
+  folderButton.addEventListener('click', async () => {
+    if (!state.currentFilePath) { setStatus('请先打开或保存文档，再关联图片文件夹。'); return; }
+    try { const result = await invoke('link_image_folder', { documentPath: state.currentFilePath }); if (result.linked) { for (const entry of imageHydrationReleases.values()) entry.release.refresh(); scheduleImageHydration(); setStatus('已关联图片文件夹'); } }
+    catch (error) { setStatus(`关联失败：${error.message || error}`); }
+  });
+}
+if (isTauriRuntime()) {
+  void getCurrentWindow().onCloseRequested(async (event) => {
+    if (allowNativeClose) return;
+    event.preventDefault();
+    try {
+      if (await confirmDiscardChanges()) {
+        await workspaceController.flush(); allowNativeClose = true;
+        await getCurrentWindow().destroy();
+      }
+    } catch (error) { allowNativeClose = false; setStatus(`关闭失败：${error.message || error}`); }
+  });
+}
 
 updateTitle();
 updateModeButtons();

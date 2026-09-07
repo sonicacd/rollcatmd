@@ -32,6 +32,25 @@ test('extracts readable names from Android storage-provider URIs', () => {
   assert.equal(getFileDisplayName(null), '未命名.md');
 });
 
+test('Windows canonical and UNC paths retain their actual document names', () => {
+  assert.equal(getFileDisplayName('\\\\?\\C:\\notes\\发布说明.md'), '发布说明.md');
+  assert.equal(getFileDisplayName('\\\\?\\UNC\\server\\share\\发布说明.md'), '发布说明.md');
+  assert.equal(getFileDisplayName('\\\\server\\share\\发布说明.md'), '发布说明.md');
+  assert.equal(getFileDisplayName('C:notes.md'), 'notes.md');
+});
+
+test('native filenames keep literal hash and percent characters', () => {
+  assert.equal(getFileDisplayName('C:\\notes\\章节#2.md'), '章节#2.md');
+  assert.equal(getFileDisplayName('C:\\notes\\literal%20name.md'), 'literal%20name.md');
+  assert.equal(getFileDisplayName('/notes/a:b?c#d.md'), 'a:b?c#d.md');
+});
+
+test('URI query stripping preserves encoded filename punctuation', () => {
+  assert.equal(getFileDisplayName('content://docs/document/primary%3ADownload%2F%E7%AC%94%E8%AE%B0%23%3F.md?token=1#view'), '笔记#?.md');
+  assert.equal(getFileDisplayName('file:///C:/notes/Chapter%232.md?download=1'), 'Chapter#2.md');
+  assert.equal(getFileDisplayName('content://docs/invalid%name.md?token=1'), 'invalid%name.md');
+});
+
 test('writes document URIs through the filesystem plugin', async () => {
   const calls = [];
 

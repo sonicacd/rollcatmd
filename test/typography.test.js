@@ -81,7 +81,7 @@ test('heading scale follows the Obsidian default hierarchy without decorative ru
 test('viewport-rendered documents keep the same typography and readable width', () => {
   assert.match(
     rendererSource,
-    /'&\.cm-large-preview \.cm-scroller':\s*\{[^}]*fontSize:\s*'16px',[^}]*lineHeight:\s*'1\.5'/s
+    /'&\.cm-large-preview \.cm-scroller':\s*\{[^}]*fontSize:\s*'var\(--document-font-size, 16px\)',[^}]*lineHeight:\s*'var\(--document-line-height, 1\.5\)'/s
   );
   assert.match(
     rendererSource,

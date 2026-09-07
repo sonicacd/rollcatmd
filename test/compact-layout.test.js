@@ -15,7 +15,7 @@ test('the compact toolbar omits duplicate app and file-name blocks', () => {
 test('desktop exposes the toolbar collapse control and preserves an expand strip', () => {
   assert.match(
     styles,
-    /\.mobile-chrome-toggle\s*\{[\s\S]*?display:\s*grid;[\s\S]*?order:\s*10;[\s\S]*?margin-left:\s*auto;/
+    /\.mobile-chrome-toggle,[\s\S]*?display:\s*grid;[\s\S]*?width:\s*32px;/
   );
   assert.match(
     styles,
@@ -51,7 +51,7 @@ test('visual status only shows document counts while announcements remain access
   );
   assert.match(
     pageHtml,
-    /<span\s+id="countText"\s+aria-live="off"[\s\S]*?>0 字符 \/ 约 0 tokens<\/span>/
+    /<span\s+id="countText"\s+aria-live="off"[\s\S]*?>0 字符<\/span>/
   );
   assert.match(
     styles,
@@ -59,12 +59,9 @@ test('visual status only shows document counts while announcements remain access
   );
   assert.match(
     styles,
-    /\.statusbar\s*\{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?gap:\s*0;/
+    /\.statusbar\s*\{[\s\S]*?flex:\s*0 1 auto;[\s\S]*?font-size:\s*11px;/
   );
   assert.doesNotMatch(updateCountsSource, /大文件模式|formatFileSize/);
   assert.doesNotMatch(updateCountsSource, /词/);
-  assert.match(
-    updateCountsSource,
-    /documentText\.length\.toLocaleString\(\).*字符\s*\/\s*约.*tokenEstimate\.toLocaleString\(\).*tokens/s
-  );
+  assert.match(pageHtml, /id="showTokens" type="checkbox"/);
 });

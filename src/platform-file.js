@@ -13,7 +13,16 @@ export function getFileDisplayName(filePath, fallback = '未命名.md') {
     return fallback;
   }
 
-  let decodedPath = String(filePath);
+  const path = String(filePath);
+  if (!isUriBackedFilePath(path)) {
+    // Desktop paths may contain a verbatim Windows prefix (\\?\), literal
+    // percent signs or # characters. They have no URI query or escaping rules.
+    return path.replace(/^[a-z]:/i, '').split(/[\\/]/).filter(Boolean).at(-1) || fallback;
+  }
+
+  // Remove the URI's real query/fragment before decoding escaped filename
+  // characters such as %23 and %3F, which belong to the displayed filename.
+  let decodedPath = path.split(/[?#]/, 1)[0];
 
   try {
     decodedPath = decodeURIComponent(decodedPath);
@@ -22,8 +31,7 @@ export function getFileDisplayName(filePath, fallback = '未命名.md') {
     // letting a cosmetic filename failure interrupt document handling.
   }
 
-  const withoutQuery = decodedPath.split(/[?#]/, 1)[0];
-  const segments = withoutQuery.split(/[\\/:]/).filter(Boolean);
+  const segments = decodedPath.split(/[\\/:]/).filter(Boolean);
   return segments.at(-1) || fallback;
 }
 

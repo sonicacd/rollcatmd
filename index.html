@@ -8,90 +8,84 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">
-          <img class="brand-icon" src="/src/assets/cat-md-icon.png" alt="" aria-hidden="true">
+    <header class="sidebar" aria-label="文档工具栏">
+      <div class="document-strip">
+        <div class="brand" title="滚猫md">
+          <div class="brand-mark"><img class="brand-icon" src="/src/assets/cat-md-icon.png" alt="滚猫md"></div>
+        </div>
+        <div class="mobile-document-meta" aria-label="当前文档">
+          <span id="mobileDocumentName">未命名.md</span>
+          <span id="mobileDirtyState" aria-hidden="true"></span>
+        </div>
+        <footer class="statusbar" aria-label="文档状态">
+          <span id="statusText" role="status" aria-live="polite" aria-atomic="true">已就绪</span>
+          <span id="countText" aria-live="off" title="文档字符数；可在阅读设置中开启 token 估算">0 字符</span>
+        </footer>
+        <details class="toolbar-popover preferences-popover" id="preferencesMenu">
+          <summary class="tool-button" id="preferencesButton" title="阅读设置" aria-controls="preferencesPanel">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10m4 0h2M4 17h2m4 0h10M14 4v6M6 14v6"/></svg>
+            <span>阅读设置</span>
+          </summary>
+          <section class="popover-panel preferences-panel" id="preferencesPanel" aria-label="阅读设置">
+            <div class="popover-heading">阅读设置<span>自动记住你的选择</span></div>
+            <label class="preference-row" for="fontSizeSelect"><span>文字大小</span><select id="fontSizeSelect"><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option></select></label>
+            <label class="preference-row" for="lineHeightSelect"><span>行间距</span><select id="lineHeightSelect"><option value="1.5" selected>紧凑 · 1.5</option><option value="1.7">舒适 · 1.7</option><option value="2">宽松 · 2.0</option></select></label>
+            <label class="preference-row" for="contentWidthSelect"><span>正文宽度</span><select id="contentWidthSelect"><option value="1200" selected>标准 · 1200 px</option><option value="1600">宽幅 · 1600 px</option><option value="2100">超宽 · 2100 px</option><option value="full">铺满可用宽度</option></select></label>
+            <div class="popover-divider"></div>
+            <label class="preference-check" for="outlineEnabled"><span><strong>启用章节大纲</strong><small>在工具栏显示大纲入口</small></span><input id="outlineEnabled" type="checkbox" checked></label>
+            <label class="preference-check" for="showTokens"><span><strong>显示 tokens 估算</strong><small>在字符数旁显示，实际分词因模型而异</small></span><input id="showTokens" type="checkbox"></label>
+          </section>
+        </details>
+        <label class="theme-control" id="mobileThemeControl" for="themeSelect">
+          <span class="meta-label">主题</span>
+          <select id="themeSelect" aria-label="界面主题"><option value="black">纯黑</option><option value="white">纯白</option><option value="eye">护眼</option></select>
+        </label>
+        <button class="mobile-chrome-toggle" id="mobileChromeToggle" type="button" aria-expanded="true" aria-controls="mobileFileToolbar mobileModeSwitch mobileThemeControl preferencesMenu mobileFormattingToolbar" title="收起界面控件">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6.5 14.5 5.5-5 5.5 5"></path></svg>
+          <span class="mobile-chrome-toggle-label">收起界面控件</span>
+        </button>
+      </div>
+      <div class="action-strip">
+        <nav class="toolbar" id="mobileFileToolbar" aria-label="文件、编辑和帮助操作">
+          <button class="tool-button" id="newButton" type="button" title="新建（Ctrl+N）" aria-keyshortcuts="Control+N Meta+N"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9l-6-6Z"/><path d="M13 3v6h6M9 15h6m-3-3v6"/></svg><span>新建</span></button>
+          <button class="tool-button" id="openButton" type="button" title="打开（Ctrl+O）" aria-keyshortcuts="Control+O Meta+O"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5a1 1 0 0 1 1-1h5l2 3h8a1 1 0 0 1 1 1v2M3 10h18l-3 10H5L3 10Z"/></svg><span>打开</span></button>
+          <button class="tool-button primary" id="saveButton" type="button" title="保存（Ctrl+S）" aria-keyshortcuts="Control+S Meta+S"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M7 3v6h9V3M7 21v-8h10v8"/></svg><span>保存</span></button>
+          <span class="toolbar-separator" aria-hidden="true"></span>
+          <button class="tool-button" id="findButton" type="button" title="查找和替换（Ctrl+F）" aria-controls="findReplacePanel" aria-keyshortcuts="Control+F Meta+F"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span>查找</span></button>
+          <button class="tool-button" id="outlineToggle" type="button" aria-expanded="false" aria-controls="outlinePanel" title="展开章节大纲"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"/></svg><span>大纲</span></button>
+          <details class="toolbar-popover more-popover" id="moreMenu">
+            <summary class="tool-button" id="moreButton" title="更多操作" aria-controls="morePanel"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>更多</span></summary>
+            <div class="popover-panel more-panel" id="morePanel">
+              <span class="menu-label">文档</span>
+              <button id="recentButton" type="button" aria-haspopup="dialog" aria-controls="recentDialog"><span>最近打开</span><span class="menu-hint">继续阅读</span></button>
+              <button id="saveAsButton" type="button" aria-keyshortcuts="Control+Shift+S Meta+Shift+S"><span>另存为</span><kbd>Ctrl+Shift+S</kbd></button>
+              <button id="draftsButton" type="button" aria-haspopup="dialog" aria-controls="draftsDialog"><span>恢复草稿</span></button>
+              <div class="popover-divider"></div>
+              <span class="menu-label">编辑与分享</span>
+              <button id="goToLineButton" type="button" aria-haspopup="dialog" aria-controls="goToLineDialog" aria-keyshortcuts="Control+G Meta+G"><span>跳转到行</span><kbd>Ctrl+G</kbd></button>
+              <button id="linkImageFolderButton" type="button" hidden><span>关联图片文件夹</span></button>
+              <button id="insertImageButton" type="button"><span>插入本地图片</span></button>
+              <button id="copySelectionImageButton" type="button"><span>选中内容复制为图片</span></button>
+              <button id="exportImageButton" type="button" aria-haspopup="dialog" aria-controls="imageExportDialog"><span>导出全文图片</span></button>
+              <div class="popover-divider"></div>
+              <button id="helpButton" type="button" aria-haspopup="dialog" aria-controls="helpDialog"><span>使用帮助</span></button>
+            </div>
+          </details>
+        </nav>
+        <div class="mode-switch" id="mobileModeSwitch" role="group" aria-label="编辑模式">
+          <button class="mode-button active" id="wysiwygMode" type="button" aria-pressed="true" aria-keyshortcuts="Control+1 Meta+1">所见即所得</button>
+          <button class="mode-button" id="markdownMode" type="button" aria-pressed="false" aria-keyshortcuts="Control+2 Meta+2">源码</button>
+          <button class="mode-button" id="readerMode" type="button" aria-pressed="false" aria-keyshortcuts="Control+3 Meta+3">阅读</button>
         </div>
       </div>
-
-      <div class="mobile-document-meta" aria-label="当前文档">
-        <span id="mobileDocumentName">未命名.md</span>
-        <span id="mobileDirtyState" aria-hidden="true"></span>
-      </div>
-
-      <button
-        class="mobile-chrome-toggle"
-        id="mobileChromeToggle"
-        type="button"
-        aria-expanded="true"
-        aria-controls="mobileFileToolbar mobileModeSwitch mobileThemeControl mobileFormattingToolbar"
-        title="收起界面控件"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="m6.5 14.5 5.5-5 5.5 5"></path>
-        </svg>
-        <span class="mobile-chrome-toggle-label">收起界面控件</span>
-      </button>
-
-      <nav class="toolbar" id="mobileFileToolbar" aria-label="文件、编辑和帮助操作">
-        <button class="tool-button" id="newButton" type="button" aria-keyshortcuts="Control+N Meta+N">新建</button>
-        <button class="tool-button" id="openButton" type="button" aria-keyshortcuts="Control+O Meta+O">打开</button>
-        <button class="tool-button primary" id="saveButton" type="button" aria-keyshortcuts="Control+S Meta+S">保存</button>
-        <button class="tool-button" id="saveAsButton" type="button" aria-keyshortcuts="Control+Shift+S Meta+Shift+S">另存为</button>
-        <button
-          class="tool-button"
-          id="goToLineButton"
-          type="button"
-          aria-haspopup="dialog"
-          aria-controls="goToLineDialog"
-          aria-keyshortcuts="Control+G Meta+G"
-        >跳转</button>
-        <button
-          class="tool-button"
-          id="exportImageButton"
-          type="button"
-          aria-haspopup="dialog"
-          aria-controls="imageExportDialog"
-        >图片</button>
-        <button class="tool-button" id="helpButton" type="button" aria-haspopup="dialog" aria-controls="helpDialog">帮助</button>
-      </nav>
-
-      <div class="mode-switch" id="mobileModeSwitch" role="group" aria-label="编辑模式">
-        <span class="meta-label">视图</span>
-        <button class="mode-button active" id="wysiwygMode" type="button" aria-pressed="true" aria-keyshortcuts="Control+1 Meta+1">所见即所得</button>
-        <button class="mode-button" id="markdownMode" type="button" aria-pressed="false" aria-keyshortcuts="Control+2 Meta+2">源码</button>
-        <button class="mode-button" id="readerMode" type="button" aria-pressed="false" aria-keyshortcuts="Control+3 Meta+3">阅读</button>
-      </div>
-
-      <label class="theme-control" id="mobileThemeControl" for="themeSelect">
-        <span class="meta-label">主题</span>
-        <select id="themeSelect" aria-label="界面主题">
-          <option value="black">纯黑</option>
-          <option value="white">纯白</option>
-          <option value="eye">护眼</option>
-        </select>
-      </label>
-
-      <footer class="statusbar" aria-label="文档状态">
-        <span id="statusText" role="status" aria-live="polite" aria-atomic="true">已就绪</span>
-        <span
-          id="countText"
-          aria-live="off"
-          title="通用 LLM token 估算值；不同模型的实际分词结果可能不同"
-        >0 字符 / 约 0 tokens</span>
-      </footer>
-    </aside>
+    </header>
 
     <main class="main-area">
-      <header class="topbar">
-        <div>
-          <div class="document-kicker">Live Preview</div>
-          <h1 class="document-title">Markdown 工作台</h1>
-        </div>
-        <div class="window-note">Tauri + 系统 WebView</div>
-      </header>
-
+      <nav class="outline-panel" id="outlinePanel" aria-labelledby="outlineTitle" hidden>
+        <header class="outline-heading"><div><span class="outline-kicker">文档导航</span><h2 id="outlineTitle">章节大纲</h2></div><button class="icon-button" id="outlineCloseButton" type="button" title="收起大纲" aria-label="收起章节大纲">×</button></header>
+        <p class="outline-empty" id="outlineEmpty">添加 Markdown 标题后，章节会显示在这里。</p>
+        <ol class="outline-list" id="outlineList"></ol>
+      </nav>
       <div class="workspace">
         <form class="find-replace-panel" id="findReplacePanel" role="search" aria-label="查找和替换" hidden>
           <div class="find-replace-row">
@@ -126,6 +120,25 @@
       </div>
     </main>
   </div>
+
+  <dialog class="workspace-dialog" id="recentDialog" aria-labelledby="recentTitle">
+    <header class="workspace-dialog-header"><div><div class="dialog-eyebrow">回到文档</div><h2 id="recentTitle">最近打开</h2></div><button class="icon-button" id="closeRecentButton" type="button" title="关闭（Esc）" aria-label="关闭最近打开">×</button></header>
+    <p class="workspace-dialog-intro">打开文档时，接着上次的位置和视图继续。</p>
+    <div class="document-list" id="recentList"></div>
+    <footer class="workspace-dialog-actions"><button id="clearRecentButton" type="button">清空记录</button></footer>
+  </dialog>
+
+  <dialog class="workspace-dialog" id="draftsDialog" aria-labelledby="draftsTitle">
+    <header class="workspace-dialog-header"><div><div class="dialog-eyebrow">本机恢复副本</div><h2 id="draftsTitle">恢复草稿</h2></div><button class="icon-button" id="closeDraftsButton" type="button" title="关闭（Esc）" aria-label="关闭恢复草稿">×</button></header>
+    <p class="workspace-dialog-intro">恢复在此设备上保留的未保存内容，确认后再保存到文件。</p>
+    <div class="document-list" id="draftsList"></div>
+  </dialog>
+
+  <dialog class="workspace-dialog save-confirm-dialog" id="confirmSaveDialog" aria-labelledby="confirmSaveTitle" aria-describedby="confirmSaveSummary">
+    <header class="workspace-dialog-header"><div><div class="dialog-eyebrow">未保存的更改</div><h2 id="confirmSaveTitle">保存当前更改？</h2></div></header>
+    <p class="workspace-dialog-intro" id="confirmSaveSummary"><strong id="confirmSaveName">未命名.md</strong> 中还有未保存的内容。</p>
+    <footer class="workspace-dialog-actions save-confirm-actions"><button id="cancelDiscardButton" type="button" autofocus>取消</button><button class="quiet-button" id="discardChangesButton" type="button">放弃更改</button><button class="primary" id="saveAndContinueButton" type="button">保存并继续</button></footer>
+  </dialog>
 
   <dialog
     class="help-dialog"
@@ -162,20 +175,23 @@
               <div><dt>打开</dt><dd><kbd>Ctrl</kbd> + <kbd>O</kbd></dd></div>
               <div><dt>保存</dt><dd><kbd>Ctrl</kbd> + <kbd>S</kbd></dd></div>
               <div><dt>另存为</dt><dd><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></dd></div>
-              <div><dt>导出图片</dt><dd>工具栏“图片”</dd></div>
+              <div><dt>导出图片</dt><dd>“更多”→“导出全文图片”</dd></div>
             </dl>
             <p>
               Windows 版可将 <code>.md</code>、<code>.markdown</code>、<code>.mdown</code>、<code>.mkd</code> 或 <code>.txt</code>
               直接拖到窗口打开。
             </p>
             <p>
-              “图片”会先打开确认和进度弹窗。单张为 1440 × 最多约 4072px；长文按阅读排版分块生成，
+              “导出全文图片”会先打开确认和进度弹窗。单张为 1440 × 最多约 4072px；长文按阅读排版分块生成，
               一页保存 PNG，多页打包 ZIP。最终写入前可以取消，取消后不生成目标文件。
             </p>
             <p>
               Windows 和 Android 版会嵌入公网 HTTPS 的 PNG、JPEG、GIF 和 WebP；浏览器版受图片服务器
               CORS 策略限制。下载失败或不支持的图片会保留明显占位。
             </p>
+            <p>Windows 和 Android 版先保存文档，再粘贴截图或从“更多”→“插入本地图片”选择 PNG、JPEG、GIF、WebP（每图最多 32 MiB），附件会自动存入文档旁的 <code>assets</code> 文件夹。</p>
+            <p>Windows 会自动显示文档目录内的相对图片。Android 先用“更多”→“关联图片文件夹”授权文档所在目录，需要所用文件管理器支持目录访问。</p>
+            <p>本地图片暂不支持 SVG、绝对路径和 <code>../</code> 越级路径。另存到其他目录时，请一同复制 <code>assets</code> 等图片附件。</p>
           </section>
 
           <section class="help-section" aria-labelledby="helpViewsTitle">
@@ -194,6 +210,8 @@
               点击视图按钮或按 Ctrl+1/2/3 切换时，会尽量保留当前正在阅读的段落位置；文首、文末和大文档也支持位置恢复。
               排版与换行差异可能带来少量偏移，缺少可匹配文字时按阅读进度恢复。“跳转到行”优先定位到指定行。
             </p>
+            <p>“大纲”可跳转到章节并标出当前位置；“阅读设置”可完全关闭或重新启用大纲，也可调整字号、行距、1200 / 1600 / 2100 px 或全宽排版。</p>
+            <p>“更多”→“最近打开”保留最近 20 份文档，可继续上次阅读。选中文字后，可用“更多”→“选中内容复制为图片”分享；代码块右上角也可以直接复制代码。</p>
           </section>
 
           <section class="help-section" aria-labelledby="helpFindTitle">
@@ -216,7 +234,8 @@
           <section class="help-section" aria-labelledby="helpSafetyTitle">
             <h3 id="helpSafetyTitle">保存与安全</h3>
             <ul class="help-note-list">
-              <li>程序不会自动保存，标题栏的 <code>*</code> 表示有未保存更改。</li>
+              <li>标题栏的 <code>*</code> 和文件名旁的圆点表示有未保存更改。切换文档或关闭前可以保存、放弃更改或取消。</li>
+              <li>未保存内容会在本机自动保留最多 5 份恢复草稿，可从“更多”→“恢复草稿”找回；请用“保存”写入文档文件。</li>
               <li>仅打开有效的 UTF-8 文本（可带 UTF-8 BOM）；其他编码会被拒绝，防止乱码覆盖原文件。</li>
               <li>保存采用安全替换流程，并尽量保留 BOM 和原文档的换行风格。</li>
               <li>重要文件仍建议另行备份。</li>

@@ -1,3 +1,5 @@
+import { getFileDisplayName } from './platform-file.js';
+
 export const MAX_CANVAS_SIDE = 4096;
 export const MAX_CANVAS_PIXELS = 16_000_000;
 // 720 CSS pixels at 2x produces a 1440px-wide image. Two portrait A4 pages
@@ -43,19 +45,8 @@ export function deriveMaxCanvasCssHeight({
   return cssHeight;
 }
 
-function displayFileName(fileName) {
-  let decoded = String(fileName || '未命名.md');
-  try {
-    decoded = decodeURIComponent(decoded);
-  } catch {
-    // Keep malformed provider URIs usable as export names.
-  }
-  const withoutQuery = decoded.split(/[?#]/, 1)[0];
-  return withoutQuery.split(/[\\/]/).filter(Boolean).at(-1) || '未命名.md';
-}
-
 export function imageExportBaseName(fileName) {
-  const displayName = displayFileName(fileName);
+  const displayName = getFileDisplayName(fileName);
   const extensionIndex = displayName.lastIndexOf('.');
   let baseName = (extensionIndex > 0 ? displayName.slice(0, extensionIndex) : displayName)
     .replace(INVALID_FILE_NAME_CHARACTERS, '_')
@@ -101,7 +92,7 @@ export function createImageExportPlan({
   const pageCount = Math.ceil(contentCssHeight / pageCssHeight);
 
   return Object.freeze({
-    fileName: displayFileName(fileName),
+    fileName: getFileDisplayName(fileName),
     baseName: imageExportBaseName(fileName),
     cssWidth,
     pixelWidth: Math.ceil(cssWidth * pixelScale),

@@ -1,4 +1,6 @@
 mod atomic_save;
+mod document_media;
+mod recent_files;
 
 use std::{
     env, fs,
@@ -102,13 +104,26 @@ fn take_opened_urls(app: tauri::AppHandle) -> Vec<String> {
 pub fn run() {
     let app = tauri::Builder::default()
         .manage(OpenedUrls::default())
+        .manage(recent_files::RecentFiles::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(document_media::init())
         .invoke_handler(tauri::generate_handler![
             get_initial_file,
             take_opened_urls,
-            write_text_file_atomic
+            write_text_file_atomic,
+            document_media::read_local_image,
+            document_media::write_document_image,
+            document_media::link_image_folder,
+            document_media::open_document_picker,
+            document_media::copy_image_clipboard,
+            document_media::copy_text_clipboard,
+            recent_files::remember_recent_file,
+            recent_files::authorize_recent_file,
+            recent_files::forget_recent_file,
+            recent_files::clear_recent_files
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

@@ -7,6 +7,7 @@ import {
   createImageExportPlan,
   DEFAULT_IMAGE_EXPORT_PAGE_HEIGHT,
   deriveMaxCanvasCssHeight,
+  imageExportBaseName,
   imageDataToUint8Array,
   iterateImageExportPages
 } from '../src/image-export.js';
@@ -42,6 +43,13 @@ test('plans one PNG or stable numbered PNG pages', () => {
 test('sanitizes export names for the local filesystem', () => {
   assert.equal(buildImagePageFileName('CON.md', 1, 1), '_CON.png');
   assert.equal(buildImagePageFileName('content://docs/My%20File.md', 2, 12), 'My File-002.png');
+});
+
+test('export naming preserves canonical Windows basenames and native filename punctuation', () => {
+  assert.equal(imageExportBaseName('\\\\?\\C:\\notes\\发布#2.md'), '发布#2');
+  assert.equal(buildImagePageFileName('\\\\?\\UNC\\server\\share\\发布说明.md', 1, 1), '发布说明.png');
+  assert.equal(buildStreamingImagePageFileName('C:\\notes\\literal%20name.md', 2), 'literal%20name-0002.png');
+  assert.equal(imageExportBaseName('content://docs/document/primary%3ADownload%2Fnotes%23%3F.md?token=1#view'), 'notes#_');
 });
 
 test('converts browser and native binary values to Uint8Array', async () => {
