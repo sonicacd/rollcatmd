@@ -1523,6 +1523,18 @@ function getCalloutTitle(type, rawTitle) {
 }
 
 function enhanceRenderedMarkdown(root) {
+  // Keep source breaks and text nodes intact for copying and mapped search.
+  // The empty spacer affects only top-level body text in the reading view.
+  root.querySelectorAll('.toastui-editor-contents > p br').forEach((lineBreak) => {
+    if (lineBreak.nextElementSibling?.classList.contains('reader-line-gap')) {
+      return;
+    }
+    const gap = document.createElement('span');
+    gap.className = 'reader-line-gap';
+    gap.setAttribute('aria-hidden', 'true');
+    lineBreak.after(gap);
+  });
+
   const calloutPattern = /^\s*\[!([a-z][a-z0-9_-]*)\][+-]?\s*([^\n\r]*)/i;
 
   root.querySelectorAll('blockquote').forEach((block) => {

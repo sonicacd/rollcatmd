@@ -44,7 +44,7 @@ test('Help uses theme-aware modal styling and a touch-friendly responsive layout
 });
 
 test('the seven-button toolbar fits one mobile row', () => {
-  assert.match(styles, /\.toolbar\s*\{[\s\S]*?flex:\s*2 1 310px;/);
+  assert.match(styles, /\.toolbar\s*\{[\s\S]*?flex:\s*0 0 auto;/);
   assert.match(
     styles,
     /@media \(max-width:\s*820px\)[\s\S]*?\.toolbar\s*\{[\s\S]*?grid-template-columns:\s*repeat\(7, minmax\(40px, 58px\)\);/

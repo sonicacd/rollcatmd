@@ -54,6 +54,8 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 
 所见即所得、阅读及大文档轻量预览使用一致的 Obsidian 风格正文节奏：16px 正文、1.5 倍行高和清晰段距。排版内容宽度会随窗口自适应，宽屏下最大为 1200px。
 
+普通文档的阅读模式会在正文的显式换行处增加留白，方便阅读逐字稿等连续长文，原文内容和换行保持不变。列表、引用和代码块保留原有间距。桌面端三种视图使用紧凑的分段按钮组，文件操作靠左，视图切换与主题控件靠右。
+
 ### 跳转到行与导出图片
 
 点击工具栏“跳转”或按 `Ctrl+G`，输入行号后即可定位到当前文档的对应行。普通文档从所见即所得或阅读模式跳转时会切换到源码模式，以保证行号精确。
@@ -232,6 +234,8 @@ Tokens are displayed as “approximately N tokens.” This is a fast, model-inde
 - **Reader**: display only the rendered document.
 
 WYSIWYG, Reader, and large-document lightweight preview share an Obsidian-inspired reading rhythm: 16px body text, 1.5 line height, and clear paragraph spacing. Rendered content adapts to the window and is capped at 1200px on wide screens.
+
+For regular documents, Reader adds breathing room at explicit body-text line breaks to make transcripts and long passages easier to read, while preserving the source text and line breaks. Lists, quotes, and code blocks retain their existing spacing. Desktop views use a compact segmented control, with file actions on the left and view/theme controls on the right.
 
 ### Go to Line and Image Export
 

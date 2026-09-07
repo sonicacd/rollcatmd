@@ -1408,6 +1408,13 @@ html.android-runtime .mobile-document-meta {
   color: var(--text);
 }
 
+/* Toast UI renders consecutive source lines as breaks inside one reader paragraph.
+   Give those explicit body breaks the same breathing room as editor paragraphs. */
+.reader-panel .toastui-editor-contents .reader-line-gap {
+  display: block;
+  height: var(--document-paragraph-spacing);
+}
+
 :is(.toastui-editor-ww-container, .toastui-editor-md-preview, .reader-panel) .toastui-editor-contents :is(h1, h2, h3, h4, h5, h6) {
   margin-block-start: var(--document-paragraph-spacing);
   margin-block-end: var(--document-paragraph-spacing);
@@ -1819,12 +1826,12 @@ html.android-runtime .mobile-document-meta {
 }
 
 .toolbar {
-  flex: 2 1 310px;
+  flex: 0 0 auto;
   grid-template-columns: none;
 }
 
 .mode-switch {
-  flex: 2 1 255px;
+  flex: 0 0 auto;
   justify-self: auto;
 }
 
@@ -1918,6 +1925,53 @@ html.android-runtime .mobile-document-meta {
 
 /* Desktop toolbar collapse keeps a compact document strip and restores the editor height. */
 @media (min-width: 821px) {
+  .mode-switch {
+    gap: 2px;
+    margin-left: auto;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface-deep);
+  }
+
+  .mode-switch .mode-button {
+    flex: 0 0 auto;
+    min-width: 52px;
+    min-height: 28px;
+    padding: 0 12px;
+    border-color: transparent;
+    border-radius: 6px;
+    background: transparent;
+    white-space: nowrap;
+  }
+
+  .mode-switch #wysiwygMode {
+    min-width: 0;
+  }
+
+  .mode-switch .mode-button:hover {
+    background: var(--button-hover-bg);
+  }
+
+  .mode-switch .mode-button.active {
+    border-color: var(--active-border);
+    background: var(--active-bg);
+  }
+
+  .mobile-chrome-toggle {
+    margin-left: 0;
+  }
+
+  .statusbar {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  #countText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   html.mobile-chrome-collapsed .sidebar {
     flex-wrap: nowrap;
   }
@@ -2402,6 +2456,31 @@ select {
   .help-dialog {
     max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 16px);
     max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
+  }
+}
+
+@media (min-width: 821px) and (max-width: 1100px) {
+  .sidebar {
+    gap: 4px 8px;
+  }
+
+  .toolbar .tool-button {
+    min-width: 44px;
+    padding: 0 7px;
+  }
+
+  .theme-control .meta-label {
+    display: none;
+  }
+
+  .statusbar {
+    order: 11;
+    flex: 1 0 100%;
+    font-size: 11px;
+  }
+
+  html.mobile-chrome-collapsed .statusbar {
+    display: none;
   }
 }
 
