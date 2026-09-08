@@ -4,11 +4,11 @@
 
 # 滚猫md / rollcat-md
 
-一款轻量的 Windows 与 Android Markdown 阅读与编辑软件，支持所见即所得、源码编辑、专注阅读，以及面向大文件的可视区分块渲染。
+一款轻量的 Windows 与 Android Markdown 阅读与编辑软件，支持 TextPack 单文件图文文档、所见即所得、源码编辑、专注阅读，以及面向大文件的可视区分块渲染。
 
-A lightweight Windows and Android Markdown reader and editor with WYSIWYG editing, source editing, focused reading, and viewport rendering for large files.
+A lightweight Windows and Android Markdown reader and editor with single-file TextPack documents, WYSIWYG editing, source editing, focused reading, and viewport rendering for large files.
 
-[中文说明](#中文说明) · [English Guide](#english-guide) · [更新记录](CHANGELOG.md) · [v0.4.0 发布说明](docs/releases/v0.4.0.md)
+[中文说明](#中文说明) · [English Guide](#english-guide) · [更新记录](CHANGELOG.md) · [v0.5.2 发布说明](docs/releases/v0.5.2.md)
 
 ---
 
@@ -26,11 +26,26 @@ A lightweight Windows and Android Markdown reader and editor with WYSIWYG editin
 
 桌面端顶部工具栏集中提供文件操作、三种视图、查找和大纲；“更多”菜单收纳最近打开、恢复草稿和分享操作。顶部控件可以收起，保留当前文档名和展开按钮，为正文腾出空间。
 
-免安装 EXE 的阅读设置、最近打开记录和恢复草稿保存在本机 WebView 应用数据中。复制 EXE 到另一台设备时，这些记录不会随文件迁移；移动文档时请一并复制引用的图片附件。
+免安装 EXE 的阅读设置、最近打开记录和恢复草稿保存在本机 WebView 应用数据中。复制 EXE 到另一台设备时，这些记录不会随文件迁移；移动普通 Markdown 文档时请一并复制引用的图片附件，TextPack 内置附件会随文件一起移动。
+
+### Windows 打开方式与默认应用
+
+Windows 版“更多”菜单提供两个入口：
+
+- **添加到右键打开方式**：将当前运行的 EXE 注册为当前用户的打开候选，支持 `.md`、`.markdown`、`.mdown`、`.mkd`、`.txt` 和 `.textpack`，无需管理员权限。随后可在文件的“打开方式”中选择“滚猫md”。注册后现有默认应用继续保留。
+- **设为默认 .md 程序**：先完成上述注册，再打开 Windows“默认应用”设置。找到 `.md`，选择“滚猫md”，并在系统界面中确认。应用只提示设置页已打开，默认应用由这一步确认决定。
+
+支持应用专页的 Windows 11 版本可直接进入滚猫md的默认应用页面；较旧系统会进入“默认应用”总页，可在其中搜索 `.md`。这些入口仅在 Windows 原生版显示，Android 和浏览器版隐藏。
+
+注册记录指向当前 EXE 的完整路径。请先把便携版放到长期使用的位置；以后移动或重命名 EXE，应从新位置启动，再点击一次“添加到右键打开方式”更新路径。
 
 ### Android 版
 
-从 [GitHub Releases 下载 ARM64 APK](https://github.com/sonicacd/rollcatmd/releases/latest/download/rollcat-md-android-arm64.apk)。
+从 [GitHub Releases](https://github.com/sonicacd/rollcatmd/releases) 中包含 Android 产物的版本下载 `rollcat-md-android-arm64.apk`。v0.5.2 更新 Android APK，Windows 继续使用 v0.5.1 EXE。
+
+安装后，可在文件管理器中对 `.md`、`.txt`、`.textpack` 选择“打开方式”→“滚猫md”。应用同时兼容常见 Markdown、文本、TextPack 及通用二进制/ZIP 类型声明，接收后按文件的真实名称检查支持的扩展名。因此部分其他二进制或 ZIP 文件也可能显示滚猫md候选，选择后会提示文件类型不支持。具体入口样式由文件管理器决定。
+
+Android 桌面图标与 PC 使用同一张猫图标，并提供系统所需的圆形和自适应资源。
 
 Android 版使用系统文件选择器，不申请整盘存储权限。从系统选择器打开的文件会作为导入文档；第一次点击“保存”时会让你选择导出位置，之后在当前会话中可直接覆盖该导出文档。
 
@@ -39,6 +54,8 @@ Android 版使用系统文件选择器，不申请整盘存储权限。从系统
 本地构建需要 Android SDK 36、NDK、JDK 和 Rust Android target。初次生成工程后，使用 `npm run dist:android` 生成 ARM64 APK。
 
 ### 快速上手
+
+首次打开时会自动显示帮助，先介绍 Windows 的打开方式和默认 `.md` 程序设置，再说明编辑、阅读、TextPack、网页粘贴等常用功能。勾选“下次不再展示”并关闭帮助后，以后启动不再自动弹出；仍可通过“更多”→“使用帮助”手动打开。
 
 1. 点击“新建”创建文档，点击“打开”选择已有文件，或把支持的文件直接拖进窗口。“更多”→“最近打开”可以继续之前的文档。
 2. 在“所见即所得”“源码”“阅读”三种视图之间切换；点击“大纲”按章节导航，点击“查找”搜索和替换文字。
@@ -86,9 +103,30 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 
 Windows 版支持文档所在目录及其子目录内的相对图片，例如 `![截图](assets/screenshot.png)`。所见即所得、阅读与图片导出使用当前文档的位置解析图片。支持 PNG、JPEG、GIF 和 WebP，每张图片最大 32 MiB；SVG 暂不支持。父目录越级路径、绝对路径和指向授权目录外的符号链接不会读取。
 
-先保存文档，然后粘贴截图或选择“更多”→“插入本地图片”。图片会使用唯一文件名写入文档旁的 `assets/` 文件夹，并插入 Markdown 相对路径。移动文档时请连同附件目录一起移动。“另存为”到其他目录只保存 Markdown 文件，请将引用的附件目录一并复制到新位置，保持相对路径有效。
+普通 Markdown 文档需先保存，然后粘贴截图或选择“更多”→“插入本地图片”。图片会使用唯一文件名写入文档旁的 `assets/` 文件夹，并插入 Markdown 相对路径。移动文档时请连同附件目录一起移动。普通 Markdown 的“另存为”到其他目录只保存正文文件，请将引用的附件目录一并复制到新位置，保持相对路径有效。
 
 Android 版先从“更多”→“关联图片文件夹”打开系统目录选择器，授权直接包含当前 Markdown 文件的文件夹。系统允许保留授权时，以后可以继续读取相对图片并在该目录的 `assets/` 中保存附件。部分应用提供的内容来源无法关联可访问目录，需要通过系统选择器重新打开或另存文档后再授权。浏览器版受文件系统访问权限限制，请按界面提示操作。
+
+### TextPack 单文件图文文档
+
+从“更多”选择“另存为 TextPack”，即可将当前 Markdown 正文和引用的可访问本地图片保存为一个 `.textpack` 文件。TextPack 使用 ZIP 容器，包内保存 Markdown、`info.json` 和原始二进制图片；图片无需写成 Base64。移动或发送这个文件时，内置图片会一起携带。
+
+- 从“更多”选择“新建 TextPack”可直接创建带内置附件的文档，无需先建立外部图片文件夹。
+- 使用“打开”选择 `.textpack`，Windows 也支持拖入或通过命令行打开。打开后可在三种视图中编辑与阅读；“保存”和普通“另存为”继续使用 TextPack 格式。
+- 在 TextPack 内粘贴截图或使用“插入本地图片”，图片会直接加入包内附件；手动保存后写入 `.textpack`。恢复草稿同时保留正文和包内附件。
+- 将普通 Markdown 转为 TextPack 时，需要能读取它引用的本地图片。Windows 使用文档所在目录；Android 需要先关联图片文件夹。网络图片保留原网址，离线阅读仍需要图片已在包内。
+- TextPack 的内置图片可在浏览器版显示。浏览器直接打开普通 `.md` 时没有旁边图片目录的访问权限；请在原生版完成含此类附件的转换。浏览器回退为下载时，应用无法确认下载已保存，会保留当前文档状态和未保存提示。
+- 支持 PNG、JPEG、GIF 和 WebP，每张最多 32 MiB；压缩包大小与解压后总大小分别最多 128 MiB，最多 4,096 个条目。当前不直接打开 `.textbundle` 文件夹。
+
+其他软件需要支持 TextPack 才能直接编辑。也可以用 ZIP 解压工具取出正文和附件，再用普通 Markdown 编辑器打开正文。Android 从系统选择器导入 TextPack 后，首次保存仍需要选择导出位置。
+
+### 粘贴网页图文
+
+在网页中选中包含文字和图片的内容并复制，然后粘贴到编辑区。应用会把剪贴板中的 HTML 转为 Markdown，保留主要内容顺序、标题、列表及基础文字样式，并尝试下载其中可访问的 HTTPS 图片。
+
+在 TextPack 中，成功下载的图片直接加入包内附件。空白且未保存的文档在成功包含网页图片后自动采用 TextPack；已有普通 Markdown 文档在原生版中使用文档旁的 `assets/` 附件目录。下载失败的图片保留可见的 Markdown 链接，方便稍后重新获取。
+
+每次网页图文粘贴最多下载 32 张图片，每张最多 8 MiB，合计最多 32 MiB；仅访问 HTTPS 图片。浏览器下载仍受来源服务器的 CORS 策略限制。剪贴板需提供 HTML，复杂网页布局会转换为适合 Markdown 的基本结构。
 
 ### 支持的 Markdown 格式
 
@@ -145,10 +183,11 @@ Android 版先从“更多”→“关联图片文件夹”打开系统目录选
 - `.mdown`
 - `.mkd`
 - `.txt`
+- `.textpack`（Markdown 正文与内置图片）
 
-Windows 版也可以把支持的文件直接拖进程序窗口打开。单文件版不会自动注册文件关联；如果希望双击 Markdown 时启动滚猫md，可在 Windows“打开方式”中浏览并选择 `rollcat-md.exe`。
+Windows 版也可以把支持的文件直接拖进程序窗口打开。从“更多”选择“添加到右键打开方式”可登记上述扩展名的打开候选；需要双击 `.md` 时启动滚猫md，可选择“设为默认 .md 程序”并在 Windows 设置中完成确认。
 
-文件必须是有效的 **UTF-8** 文本，可以带或不带 UTF-8 BOM。为了避免乱码后覆盖原文件，GBK、UTF-16 等其他编码会被拒绝打开，请先使用其他工具转换为 UTF-8。
+普通文本文件及 TextPack 包内的 Markdown 正文必须是有效的 **UTF-8** 文本，可以带或不带 UTF-8 BOM。为了避免乱码后覆盖原文件，GBK、UTF-16 等其他编码会被拒绝打开，请先使用其他工具转换为 UTF-8。
 
 ### 快捷键
 
@@ -167,7 +206,7 @@ Windows 版也可以把支持的文件直接拖进程序窗口打开。单文件
 ### 保存与恢复草稿
 
 - **原文档文件由你手动保存。** 标题末尾的 `*` 或文件名旁的圆点表示仍有修改未写入原文件。
-- 编辑停止约 1.5 秒后，软件会自动将完整未保存内容写入本机恢复草稿；持续输入时每约 10 秒检查并保存一次。大文档也保留完整正文。
+- 编辑停止约 1.5 秒后，软件会自动将完整未保存内容写入本机恢复草稿；持续输入时每约 10 秒检查并保存一次。大文档也保留完整正文，TextPack 草稿还包含包内附件。
 - 在“更多”→“恢复草稿”中找回内容。最多滚动保留 5 份恢复副本，同一份草稿会随编辑更新；超过数量时淘汰较早记录。这里提供有限的恢复副本，长期版本历史和重要文档备份仍需自行管理。
 - 新建、打开其他文件或关闭程序前，存在未保存内容时可以选择“保存并继续”“放弃更改”或“取消”。选择放弃后，已保留的恢复草稿仍可找回；原文件保持上次手动保存的内容。
 - 成功保存当前完整内容后，对应恢复草稿会移除。草稿写入失败时界面会提示，请及时手动保存。
@@ -179,15 +218,16 @@ Windows 版也可以把支持的文件直接拖进程序窗口打开。单文件
 - 文档在本机读取、编辑和保存，不需要登录，也不会上传到服务器。
 - 最近文档路径、阅读位置和完整恢复草稿会保留在本机应用数据中。可以在界面清除最近记录或删除不需要的草稿。
 - 软件不收集编辑器使用统计。
-- 显示或导出公网 HTTPS 网络图片时，软件会访问对应网址；图片服务器可能记录 IP 地址等常规请求信息。
+- 显示、导出网络图片或粘贴网页图文时，软件会访问对应的 HTTPS 图片网址；图片服务器可能记录 IP 地址等常规请求信息。
 
 ### 当前限制
 
-- 本地图片需要文档所在目录的访问权限，Android 和浏览器文件选择器存在平台边界；浏览器版导出网络图片仍受图片服务器的 CORS 策略限制。
+- 普通 Markdown 的本地图片需要文档所在目录的访问权限，Android 和浏览器文件选择器存在平台边界；TextPack 内置图片随包读取。浏览器版导出网络图片仍受图片服务器的 CORS 策略限制。
+- 普通 Markdown 另存为 TextPack 时，现有网络图片链接保留原网址；网页图文粘贴会尝试下载剪贴板中的图片。`.textbundle` 文件夹暂不支持。单图 32 MiB、包大小和解压总大小各 128 MiB、4,096 条目的限制也适用于保存。
 - 混合使用多种换行符的文档，在编辑后保存时可能统一为占主导的换行格式。
 - 大文件编辑器减少常驻的原文副本；恢复草稿仍保存完整正文，混合换行在手动保存时可能统一。
 - 恢复草稿最多保留 5 份，自动保存存在短暂延迟；重要内容请及时手动保存并另行备份。
-- 仅支持 UTF-8 文本，不会自动猜测或转换其他编码。
+- Markdown 正文仅支持 UTF-8，不会自动猜测或转换其他编码。
 
 ### 常见问题
 
@@ -201,7 +241,7 @@ Windows 版也可以把支持的文件直接拖进程序窗口打开。单文件
 
 **为什么文件无法打开？**
 
-请确认文件扩展名受支持，并且内容是有效 UTF-8。GBK、UTF-16 文件需要先转换编码。
+请确认文件扩展名受支持，并且正文是有效 UTF-8。GBK、UTF-16 文件需要先转换编码。TextPack 还需包含有效的正文与元信息；损坏、超限或不受支持的压缩包会提示错误。
 
 **为什么本地图片不显示？**
 
@@ -221,7 +261,7 @@ v0.3.4 已修复网络图片下载成功后仍可能空白的问题。请从 Git
 
 **怎样把滚猫md设为 Markdown 的默认打开程序？**
 
-在 Windows 中右键 Markdown 文件，选择“打开方式 → 选择其他应用 → 在电脑上选择应用”，找到 `rollcat-md.exe`，然后设为默认应用。
+在 Windows 版“更多”中选择“设为默认 .md 程序”。程序先注册当前 EXE，再打开系统“默认应用”设置；找到 `.md`，选择“滚猫md”并确认。也可以右键文件，通过“打开方式 → 选择其他应用”选择程序。移动或重命名便携 EXE 后，先从新位置运行并重新注册打开方式。
 
 ### 开源许可
 
@@ -241,13 +281,28 @@ The standalone EXE does not create Start-menu shortcuts or automatically change 
 
 The toolbar groups file actions, view switching, Find, and Outline. More contains recent documents, recovery drafts, and sharing actions. Collapsing the controls leaves the current filename and an expand button visible.
 
-Reading preferences, recent documents, and recovery drafts live in this device's WebView application data. Copying the EXE to another device does not transfer those records. Copy image attachments together with their Markdown document when moving files.
+Reading preferences, recent documents, and recovery drafts live in this device's WebView application data. Copying the EXE to another device does not transfer those records. Move external attachments together with ordinary Markdown files; embedded TextPack attachments travel inside the document file.
 
 rollcat-md uses the Microsoft Edge WebView2 Runtime included with most Windows 10 and Windows 11 systems. If the app does not start, install or repair WebView2 Runtime first.
 
+### Windows Open With and Default Apps
+
+The native Windows app provides two actions in **More**:
+
+- **Add to Open with** registers the currently running EXE for the current user, supporting `.md`, `.markdown`, `.mdown`, `.mkd`, `.txt`, and `.textpack`. No administrator privileges are needed. You can then choose **滚猫md** in a file's **Open with** menu; existing defaults are retained.
+- **Set as default for .md** registers the app, then opens Windows **Default apps** settings. Find `.md`, select **滚猫md**, and confirm in Windows. The app reports that Settings was opened; the final default-app choice is made there.
+
+Windows 11 versions that support app-specific settings can open the rollcat-md page directly. Older systems open the general **Default apps** page, where you can search for `.md`. Both actions are hidden in Android and browser builds.
+
+Registration points to the full path of the running EXE. Keep the portable EXE in a stable location. After moving or renaming it, launch it from the new location and choose **Add to Open with** again to update the registration.
+
 ### Android
 
-Download the [ARM64 APK from GitHub Releases](https://github.com/sonicacd/rollcatmd/releases/latest/download/rollcat-md-android-arm64.apk).
+Download `rollcat-md-android-arm64.apk` from a release that includes Android assets on [GitHub Releases](https://github.com/sonicacd/rollcatmd/releases). v0.5.2 updates the Android APK; Windows continues to use the v0.5.1 EXE.
+
+After installation, choose **Open with → 滚猫md** for `.md`, `.txt`, or `.textpack` in your file manager. The app registers common Markdown, text, TextPack, generic binary, and ZIP MIME types, then validates the real display name after receiving a file. Some unrelated binary or ZIP files may also list the app; unsupported extensions are rejected on receipt. The exact chooser UI depends on the file manager.
+
+Android launcher icons now use the same cat artwork as the PC app, with round and adaptive resources for Android launchers.
 
 The Android build uses the system document picker and does not request broad storage access. A file selected for opening is imported read-only; the first **Save** asks for an export destination, and that exported document can then be overwritten for the rest of the current session.
 
@@ -256,6 +311,8 @@ The mobile app bar includes a collapse control. Scrolling more than 40px in Read
 Local builds require Android SDK 36, the NDK, a JDK, and the Rust Android targets. After the Android project has been initialized, run `npm run dist:android` to produce an ARM64 APK.
 
 ### Quick Start
+
+Help opens automatically on first launch, starting with the Windows Open with and default `.md` actions, followed by editing, reading, TextPack, web pasting, and other common features. Check **Don't show next time** and close Help to stop automatic startup display. You can still open it manually through **More → Help**.
 
 1. Select **New**, choose **Open**, or drag a supported file onto the Windows app. Use **More → Recent Documents** to continue a previous document.
 2. Switch between **WYSIWYG**, **Source**, and **Reader**. Use **Outline** to navigate chapters and **Find** to search and replace text.
@@ -303,9 +360,30 @@ Select text and use **More → Copy Selection as Image** to create a PNG for the
 
 Windows supports images referenced relative to the document's own directory or its subdirectories, such as `![Screenshot](assets/screenshot.png)`. WYSIWYG, Reader, and image export resolve images from the current document's location. Supported formats are PNG, JPEG, GIF, and WebP, up to 32 MiB per image. SVG, parent-directory traversal, absolute paths, and symbolic links leading outside the authorized directory are unsupported.
 
-Save the document first, then paste a screenshot or select **More → Insert Local Image**. The app writes the image under a unique name in an `assets/` folder beside the document and inserts a relative Markdown link. Move the attachments together with the document. **Save As** in another directory writes only the Markdown file; copy the referenced attachment folders to that location as well to preserve relative paths.
+For ordinary Markdown, save the document first, then paste a screenshot or select **More → Insert Local Image**. The app writes the image under a unique name in an `assets/` folder beside the document and inserts a relative Markdown link. Move the attachments together with the document. **Save As** for ordinary Markdown in another directory writes only the text file; copy the referenced attachment folders to that location as well to preserve relative paths.
 
 On Android, select **More → Link Image Folder** and use the system directory picker to authorize the folder directly containing the current Markdown file. When the system retains this permission, the app can continue reading relative images and saving attachments in that folder's `assets/` directory. Some content providers cannot expose a suitable folder; reopen or save the document through the system picker before linking its folder. Browser behavior depends on file-system permissions and is explained by the interface.
+
+### Single-file TextPack Documents
+
+Choose **More → Save As TextPack** to save the current Markdown and its accessible local images as a `.textpack` file. TextPack uses a ZIP container holding Markdown, `info.json`, and the original binary images, without encoding those images as Base64. Embedded images travel with the file when it is moved or shared.
+
+- Choose **More → New TextPack** to start a document with embedded attachments, without first creating an external image folder.
+- Open `.textpack` from the file picker, or use drag-and-drop or a command-line path on Windows. All three views support editing and reading; **Save** and regular **Save As** retain the TextPack format.
+- Pasting a screenshot or using **Insert Local Image** in a TextPack adds an attachment inside the package. A manual save writes it to disk. Recovery drafts retain both the text and package attachments.
+- Converting ordinary Markdown requires access to its local images. Windows uses the document directory; Android requires a linked image folder. Remote images retain their URLs, so they still need a network connection unless already embedded.
+- The browser build can display embedded TextPack images. Opening an ordinary `.md` in a browser does not grant access to sibling image folders; use the native app to convert such documents with their attachments. If saving falls back to a browser download, the app cannot confirm that the file was saved and retains the current document state and unsaved indicator.
+- PNG, JPEG, GIF, and WebP are supported, up to 32 MiB per image. The compressed file and total uncompressed content are each limited to 128 MiB, with up to 4,096 entries. Opening `.textbundle` directories is currently unsupported.
+
+Other editors need TextPack support for direct editing. A ZIP tool can also extract the text and attachments for use with an ordinary Markdown editor. Android imports still require an export destination on the first save.
+
+### Pasting Web Text and Images
+
+Copy a selection containing text and images from a web page, then paste it into the editor. The app converts clipboard HTML to Markdown, retaining the main content order, headings, lists, and basic text styling, and attempts to download accessible HTTPS images.
+
+In a TextPack, downloaded images become embedded attachments. A blank, unsaved document switches to TextPack when web images are successfully included. Existing ordinary Markdown documents use the adjacent `assets/` folder in the native app. Failed image downloads remain as visible Markdown links for later retrieval.
+
+Each web paste downloads up to 32 images, with limits of 8 MiB per image and 32 MiB in total. Only HTTPS image URLs are fetched. Browser downloads are subject to the source server's CORS policy. The clipboard must provide HTML, and complex web layouts are converted into basic Markdown structure.
 
 ### Markdown Support
 
@@ -362,10 +440,11 @@ The application can open and save:
 - `.mdown`
 - `.mkd`
 - `.txt`
+- `.textpack` (Markdown with embedded images)
 
-The Windows app also opens supported files dropped directly onto its window. The standalone EXE does not register file associations automatically; use Windows **Open with** to select `rollcat-md.exe` as the default Markdown application if desired.
+The Windows app also opens supported files dropped directly onto its window. Choose **More → Add to Open with** to register the supported extensions. To open `.md` files by double-clicking, choose **Set as default for .md** and confirm the selection in Windows Settings.
 
-Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-16, and other encodings are rejected to prevent corrupted text from overwriting the original file. Convert them to UTF-8 before opening.
+Ordinary text files and Markdown inside a TextPack must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-16, and other encodings are rejected to prevent corrupted text from overwriting the original file. Convert them to UTF-8 before opening.
 
 ### Keyboard Shortcuts
 
@@ -384,7 +463,7 @@ Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-1
 ### Saving and Recovery Drafts
 
 - **Save the document file manually.** A trailing `*` or a dot beside its name means the file still has unsaved changes.
-- After approximately 1.5 seconds without an edit, the app writes the complete unsaved content to a local recovery draft. During continuous editing it checks and saves approximately every 10 seconds. Large-document drafts keep their full text.
+- After approximately 1.5 seconds without an edit, the app writes the complete unsaved content to a local recovery draft. During continuous editing it checks and saves approximately every 10 seconds. Large-document drafts keep their full text; TextPack drafts also retain package attachments.
 - Open **More → Recovery Drafts** to recover work. Up to five recovery copies are retained, with each active draft updated as you edit. Older entries are removed when the limit is exceeded. Keep separate backups for long-term version history and important documents.
 - Before creating or opening another document or closing the app, choose **Save and Continue**, **Discard Changes**, or **Cancel** when changes are unsaved. Discarding leaves a retained draft available for recovery and leaves the document file at its last manually saved state.
 - Saving the complete current content successfully removes its recovery draft. The interface reports draft write failures so you can save the document manually.
@@ -396,15 +475,16 @@ Files must contain valid **UTF-8** text, with or without a UTF-8 BOM. GBK, UTF-1
 - Documents are opened, edited, and saved locally. No account is required and document contents are not uploaded.
 - Recent document paths, reading positions, and complete recovery drafts are retained in local application data. You can clear recent records or delete unwanted drafts from the interface.
 - Editor usage statistics are disabled.
-- Displaying or exporting public HTTPS images connects to their URLs, and the image servers may record the IP address and other standard request metadata.
+- Displaying or exporting remote images, or pasting web text and images, connects to the corresponding HTTPS image URLs. Image servers may record the IP address and other standard request metadata.
 
 ### Current Limitations
 
-- Local images require access to the document's directory; Android and browser file pickers have platform-specific limits. Browser exports of remote images remain subject to the image server's CORS policy.
+- Local images in ordinary Markdown require access to the document's directory; Android and browser file pickers have platform-specific limits. Embedded TextPack images are read from the package. Browser exports of remote images remain subject to the image server's CORS policy.
+- Saving ordinary Markdown as TextPack retains existing remote image URLs; web pastes attempt to download images from the clipboard content. `.textbundle` directories are unsupported. The 32 MiB image limit, 128 MiB compressed and uncompressed limits, and 4,096-entry limit also apply when saving.
 - Mixed line endings may be normalized to the dominant style after editing and saving.
 - The large-document editor reduces resident copies of the source text; recovery drafts still keep complete text. Mixed line endings may be normalized when the document file is saved.
 - Recovery drafts retain up to five entries and have a short write delay. Save important content manually and keep separate backups.
-- Only UTF-8 text is supported; other encodings are not guessed or converted automatically.
+- Markdown text must use UTF-8; other encodings are not guessed or converted automatically.
 
 ### Troubleshooting
 
@@ -418,7 +498,7 @@ Files at or above 2.5 MiB use a lightweight Live Preview that only creates layou
 
 **Why will a file not open?**
 
-Check that its extension is supported and that it contains valid UTF-8 text. Convert GBK or UTF-16 files before opening.
+Check that its extension is supported and that its text uses valid UTF-8. Convert GBK or UTF-16 files before opening. TextPack also requires valid document content and metadata; damaged, oversized, or unsupported archives produce an error.
 
 **Why is a local image missing?**
 
@@ -438,7 +518,7 @@ This was a known issue in v0.3.3 and is fixed in v0.3.4 and later. Download the 
 
 **How do I make rollcat-md the default Markdown application?**
 
-Right-click a Markdown file, choose **Open with → Choose another app → Choose an app on your PC**, locate `rollcat-md.exe`, and set it as the default.
+Choose **More → Set as default for .md** in the Windows app. It registers the current EXE and opens Windows **Default apps** settings; find `.md`, select **滚猫md**, and confirm. You can also select the app through a file's **Open with → Choose another app** menu. After moving or renaming the portable EXE, launch it from its new location and register **Open with** again.
 
 ### License
 

@@ -41,11 +41,16 @@ export async function writeNativeDocument({
   writeFile,
   invoke
 }) {
+  const isBinary = content instanceof Uint8Array;
+
   if (isUriBackedFilePath(filePath)) {
-    await writeFile(filePath, new TextEncoder().encode(content));
+    await writeFile(filePath, isBinary ? content : new TextEncoder().encode(content));
     return 'document-uri';
   }
 
-  await invoke('write_text_file_atomic', { path: filePath, content });
+  await invoke(isBinary ? 'write_binary_file_atomic' : 'write_text_file_atomic', {
+    path: filePath,
+    content: isBinary ? Array.from(content) : content
+  });
   return 'atomic-path';
 }

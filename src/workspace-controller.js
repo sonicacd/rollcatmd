@@ -169,6 +169,7 @@ export function createWorkspaceController(api, options = {}) {
     const record = {
       id: context.draftId, filePath: context.filePath, name: context.name,
       content: api.markdown(), textFormat: context.textFormat,
+      textPack: context.textPack || null,
       mode: context.mode, position, revision: context.revision
     };
     // Modes and positions can change without an edit. Capture them at these

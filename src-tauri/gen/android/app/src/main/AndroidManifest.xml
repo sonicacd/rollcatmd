@@ -7,6 +7,7 @@
 
     <application
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:theme="@style/Theme.rollcat_md"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
@@ -23,27 +24,114 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
             <!-- tauri-file-associations. AUTO-GENERATED. DO NOT REMOVE. -->
+            <!-- tauri-file-associations. AUTO-GENERATED. DO NOT REMOVE. -->
+
+            <!-- Kept outside Tauri's generated block. Android config overrides
+                 fileAssociations with [] because its generated path patterns
+                 cannot constrain opaque provider URIs. MainActivity validates
+                 the provider DISPLAY_NAME before Tauri receives any file URI.
+                 Generic binary/ZIP MIME types also match unrelated files. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/x-textpack" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+            </intent-filter>
+            <!-- SEND's URI normally comes in EXTRA_STREAM, with no data URI. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/x-textpack" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+            </intent-filter>
+            <!-- Filename-bearing content URIs with a wrong MIME or no MIME.
+                 Opaque IDs still need one of the MIME registrations above.
+                 API 31+ supports arbitrary dots through pathSuffix; older
+                 Android uses simple patterns for up to four path dots. Both
+                 remain to avoid a broad URI filter on API 24-30. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" />
                 <data android:pathPattern=".*\\.md" />
+                <data android:pathPattern=".*\\..*\\.md" />
+                <data android:pathPattern=".*\\..*\\..*\\.md" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.md" />
+                <data android:pathSuffix=".md" />
                 <data android:pathPattern=".*\\.markdown" />
+                <data android:pathPattern=".*\\..*\\.markdown" />
+                <data android:pathPattern=".*\\..*\\..*\\.markdown" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.markdown" />
+                <data android:pathSuffix=".markdown" />
                 <data android:pathPattern=".*\\.mdown" />
+                <data android:pathPattern=".*\\..*\\.mdown" />
+                <data android:pathPattern=".*\\..*\\..*\\.mdown" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.mdown" />
+                <data android:pathSuffix=".mdown" />
                 <data android:pathPattern=".*\\.mkd" />
+                <data android:pathPattern=".*\\..*\\.mkd" />
+                <data android:pathPattern=".*\\..*\\..*\\.mkd" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.mkd" />
+                <data android:pathSuffix=".mkd" />
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.txt" />
+                <data android:pathSuffix=".txt" />
+                <data android:pathPattern=".*\\.textpack" />
+                <data android:pathPattern=".*\\..*\\.textpack" />
+                <data android:pathPattern=".*\\..*\\..*\\.textpack" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.textpack" />
+                <data android:pathSuffix=".textpack" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="text/plain" />
+                <data android:scheme="content" android:host="*" />
+                <data android:pathPattern=".*\\.md" />
+                <data android:pathPattern=".*\\..*\\.md" />
+                <data android:pathPattern=".*\\..*\\..*\\.md" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.md" />
+                <data android:pathSuffix=".md" />
+                <data android:pathPattern=".*\\.markdown" />
+                <data android:pathPattern=".*\\..*\\.markdown" />
+                <data android:pathPattern=".*\\..*\\..*\\.markdown" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.markdown" />
+                <data android:pathSuffix=".markdown" />
+                <data android:pathPattern=".*\\.mdown" />
+                <data android:pathPattern=".*\\..*\\.mdown" />
+                <data android:pathPattern=".*\\..*\\..*\\.mdown" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.mdown" />
+                <data android:pathSuffix=".mdown" />
+                <data android:pathPattern=".*\\.mkd" />
+                <data android:pathPattern=".*\\..*\\.mkd" />
+                <data android:pathPattern=".*\\..*\\..*\\.mkd" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.mkd" />
+                <data android:pathSuffix=".mkd" />
                 <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.txt" />
+                <data android:pathSuffix=".txt" />
+                <data android:pathPattern=".*\\.textpack" />
+                <data android:pathPattern=".*\\..*\\.textpack" />
+                <data android:pathPattern=".*\\..*\\..*\\.textpack" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.textpack" />
+                <data android:pathSuffix=".textpack" />
             </intent-filter>
-
-            <!-- tauri-file-associations. AUTO-GENERATED. DO NOT REMOVE. -->
         </activity>
 
         <provider

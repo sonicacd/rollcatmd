@@ -53,6 +53,29 @@ npm run dist:win
 
 The output is written to `src-tauri/target/release/rollcat-md.exe`.
 
+### TextPack 与网页粘贴集成检查 / TextPack and web-paste checks
+
+Windows 上可用本机 Edge 运行隔离浏览器检查。可选测试依赖放在忽略的 `work/qa` 中，不进入应用构建：
+
+Run isolated integration checks with the installed Edge on Windows. The optional runner stays under ignored `work/qa` and is excluded from application builds:
+
+```powershell
+npm install --prefix work/qa --no-package-lock --no-save playwright
+npm run test:browser
+npm run test:clipboard
+npm run test:paste-races
+npm run test:windows
+npm run test:help
+```
+
+脚本自行启动本地 Vite 服务，退出时关闭服务和隔离浏览器。它们分别覆盖文件往返与草稿恢复、真实 Ctrl+C/Ctrl+V 图文粘贴，以及异步粘贴与保存的竞态。文件选择和原生文件接口使用测试替身；图片请求使用固定样例，截图与日志写入 `work/qa`。原生文件授权、Android 系统文件选择与设备安装仍需单独验证。
+
+Each script starts and stops its own local Vite server and isolated browser. They cover file round trips and draft recovery, real Ctrl+C/Ctrl+V with web content, and asynchronous paste/save races. File pickers and native file interfaces use test doubles; image requests use fixtures, with screenshots and logs under `work/qa`. Native file authorization, Android system pickers, and device installation require separate checks.
+
+`test:windows` 验证平台可见性、菜单滚动和模拟 IPC 的成功、失败与重复点击。`test:help` 验证真实 localStorage 下的首次启动、勾选关闭后记忆、手动重开及小窗口布局。Rust 文件关联测试仅写入独立临时注册表子树，不登记正式打开候选或修改当前默认应用。
+
+`test:windows` covers platform visibility, menu scrolling, and mocked IPC success, failure, and duplicate clicks. `test:help` exercises first launch, persisted opt-out after closing, manual reopening, and small-window layout with real localStorage. Rust association tests write only an isolated temporary registry subtree; they do not register production candidates or change current defaults.
+
 ### 阅读、恢复与附件的开发约定 / Reading, recovery, and attachments
 
 - 保持三种视图及普通/大文档行为一致。新增大纲、图片或阅读设置时，验证分块渲染没有转成全文 DOM 排版。
@@ -87,11 +110,23 @@ npm run dist:android
 
 Run `android:init` only when `src-tauri/gen/android` has not been generated yet. `dist:android` builds an ARM64 APK for modern physical Android devices.
 
+`dist:android` 会先执行 `icons:android`，从 PC 原图 `src-tauri/icons/icon.png` 同步 Android 图标源目录和实际 Gradle 资源目录。可以单独运行 `npm run icons:android`。修改图标后，核对普通、圆形与自适应资源，并在最终 APK 中验证实际打包的图片，避免只更新图标源目录。
+
+`dist:android` runs `icons:android` first to sync the PC artwork in `src-tauri/icons/icon.png` into both the Android icon source directory and the resources consumed by Gradle. Run `npm run icons:android` separately when needed. Check legacy, round, and adaptive resources after an icon change, then inspect the final APK images to catch stale resources in the generated Android project.
+
+Android 文件关联可在 Windows/JDK 17 环境运行以下检查。脚本首次将带 SHA-256 校验的 Android 7/14 framework 测试 JAR 下载到忽略的 `work/qa`；缓存齐全后可加 `-Offline`。支持 `-ManifestPath` 指向 Gradle 合并后的 XML。测试直接调用 Android `IntentFilter` 和生产接收策略；文件提供者的名称查询与读取结果使用替身，真机权限、文件管理器候选界面和 Activity 冷热启动需单独验证。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/test-android-intents.ps1
+```
+
+On Windows with JDK 17, this script checks file associations using Android 7/14 framework JARs downloaded into ignored `work/qa` with pinned SHA-256 checksums. Add `-Offline` when cached, or `-ManifestPath` to check the merged Gradle manifest. Tests call Android `IntentFilter` and the production admission policy; provider name/read results use test doubles. Device permissions, file-manager chooser UI, and Activity cold/warm launches still require device checks.
+
 ## 发布验证 / Release verification
 
-前端测试、Rust 测试和构建分别记录实际命令与结果；构建成功之后，还需验证用户路径。v0.4.0 的检查清单在 [docs/qa-v0.4.0.md](docs/qa-v0.4.0.md)。IndexedDB、系统剪贴板、窗口关闭与 Android 目录授权需要浏览器或原生环境中的实际验证，单元测试覆盖不能代替这些结果。
+前端测试、Rust 测试和构建分别记录实际命令与结果；构建成功之后，还需验证用户路径。v0.5.0 的检查清单在 [docs/qa-v0.5.0.md](docs/qa-v0.5.0.md)。IndexedDB、系统剪贴板、窗口关闭与 Android 目录授权需要浏览器或原生环境中的实际验证，单元测试覆盖不能代替这些结果。
 
-Record the actual frontend test, Rust test, and build results separately, then exercise the user flows in [docs/qa-v0.4.0.md](docs/qa-v0.4.0.md). IndexedDB, the system clipboard, native window close handling, and Android folder permissions require browser or native runtime checks in addition to unit tests.
+Record the actual frontend test, Rust test, and build results separately, then exercise the user flows in [docs/qa-v0.5.0.md](docs/qa-v0.5.0.md). IndexedDB, the system clipboard, native window close handling, and Android folder permissions require browser or native runtime checks in addition to unit tests.
 
 发布时同步 `package.json`、锁文件与 Tauri/Rust 版本，并将发布说明提交到 `docs/releases/`。`release/` 已被 Git 忽略，可用于本地临时产物；需要审核的发布说明应保留在版本库中。上传后核对下载文件、版本与校验和，在发布说明中填入实际验证结果和已知限制。
 

@@ -207,7 +207,7 @@ function replaceWithPlaceholder(image) {
   image.replaceWith(label);
 }
 
-function hasImageSignature(bytes, contentType) {
+export function hasImageSignature(bytes, contentType) {
   if (contentType === 'image/png') {
     const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
     return png.every((value, index) => bytes[index] === value);

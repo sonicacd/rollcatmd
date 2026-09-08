@@ -57,8 +57,10 @@
             <summary class="tool-button" id="moreButton" title="更多操作" aria-controls="morePanel"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>更多</span></summary>
             <div class="popover-panel more-panel" id="morePanel">
               <span class="menu-label">文档</span>
+              <button id="newTextPackButton" type="button"><span>新建 TextPack</span><span class="menu-hint">内置图片</span></button>
               <button id="recentButton" type="button" aria-haspopup="dialog" aria-controls="recentDialog"><span>最近打开</span><span class="menu-hint">继续阅读</span></button>
               <button id="saveAsButton" type="button" aria-keyshortcuts="Control+Shift+S Meta+Shift+S"><span>另存为</span><kbd>Ctrl+Shift+S</kbd></button>
+              <button id="saveTextPackButton" type="button"><span>另存为 TextPack</span><span class="menu-hint">打包本地图片</span></button>
               <button id="draftsButton" type="button" aria-haspopup="dialog" aria-controls="draftsDialog"><span>恢复草稿</span></button>
               <div class="popover-divider"></div>
               <span class="menu-label">编辑与分享</span>
@@ -67,6 +69,10 @@
               <button id="insertImageButton" type="button"><span>插入本地图片</span></button>
               <button id="copySelectionImageButton" type="button"><span>选中内容复制为图片</span></button>
               <button id="exportImageButton" type="button" aria-haspopup="dialog" aria-controls="imageExportDialog"><span>导出全文图片</span></button>
+              <div class="popover-divider" data-windows-integration hidden></div>
+              <span class="menu-label" data-windows-integration hidden>Windows</span>
+              <button id="registerOpenWithButton" type="button" data-windows-integration hidden title="将当前 EXE 加入文档右键菜单的打开方式；移动 EXE 后请重新添加"><span>添加到右键打开方式</span></button>
+              <button id="defaultMarkdownButton" type="button" data-windows-integration hidden title="打开 Windows 默认应用设置，选择 .md → 滚猫md 并确认"><span>设为默认 .md 程序</span><span class="menu-hint">系统设置</span></button>
               <div class="popover-divider"></div>
               <button id="helpButton" type="button" aria-haspopup="dialog" aria-controls="helpDialog"><span>使用帮助</span></button>
             </div>
@@ -159,15 +165,32 @@
           title="关闭（Esc）"
           aria-label="关闭帮助"
           aria-keyshortcuts="Escape"
+          autofocus
         >×</button>
       </header>
 
       <div class="help-dialog-content">
         <p class="help-dialog-summary" id="helpDialogSummary">
-          文档始终在本地打开和保存；以下操作在 Windows 版和支持键盘的设备上均可使用。
+          从这里了解常用操作。关闭后，随时可以从“更多”→“使用帮助”再次查看。
         </p>
 
         <div class="help-grid">
+          <section class="help-section help-section-wide" aria-labelledby="helpWindowsTitle">
+            <h3 id="helpWindowsTitle">1. 设置打开方式（Windows）</h3>
+            <ol class="help-note-list">
+              <li><strong>更多 → 添加到右键打开方式：</strong>添加后，右键点击 Markdown 或 TextPack 文件，在“打开方式”中选择“滚猫md”。</li>
+              <li><strong>更多 → 设为默认 .md 程序：</strong>打开 Windows 默认应用设置，找到 <code>.md</code>，选择“滚猫md”并确认。以后双击 Markdown 文件即可打开。</li>
+            </ol>
+            <p>这两项仅 Windows 版提供，无需管理员权限。请先把 EXE 放到常用目录；移动 EXE 后，从新位置运行并重新添加打开方式。</p>
+          </section>
+
+          <section class="help-section help-section-wide" aria-labelledby="helpPasteTitle">
+            <h3 id="helpPasteTitle">2. 网页图文与 TextPack</h3>
+            <p>在网页选中文字和图片，<kbd>Ctrl</kbd> + <kbd>C</kbd> 复制，再在编辑区 <kbd>Ctrl</kbd> + <kbd>V</kbd> 粘贴。会保留主要内容顺序、标题、列表和基础样式，复杂排版会简化；无法下载的图片会保留链接。</p>
+            <p>想把正文和图片装进一个文件，使用“更多”→“新建 TextPack”，粘贴后保存即可。空白未保存文档成功贴入网页图片时也会自动采用 TextPack。</p>
+            <p>已有 Markdown 可用“更多”→“另存为 TextPack”打包本地图片。直接打开 <code>.textpack</code> 可继续编辑，图片随文件移动；已有网络图片会保留原网址。暂不支持直接打开 <code>.textbundle</code> 文件夹。</p>
+          </section>
+
           <section class="help-section" aria-labelledby="helpFilesTitle">
             <h3 id="helpFilesTitle">文件</h3>
             <dl class="help-shortcut-list">
@@ -178,20 +201,13 @@
               <div><dt>导出图片</dt><dd>“更多”→“导出全文图片”</dd></div>
             </dl>
             <p>
-              Windows 版可将 <code>.md</code>、<code>.markdown</code>、<code>.mdown</code>、<code>.mkd</code> 或 <code>.txt</code>
+              Windows 版可将 <code>.md</code>、<code>.markdown</code>、<code>.mdown</code>、<code>.mkd</code>、<code>.txt</code> 或 <code>.textpack</code>
               直接拖到窗口打开。
             </p>
-            <p>
-              “导出全文图片”会先打开确认和进度弹窗。单张为 1440 × 最多约 4072px；长文按阅读排版分块生成，
-              一页保存 PNG，多页打包 ZIP。最终写入前可以取消，取消后不生成目标文件。
-            </p>
-            <p>
-              Windows 和 Android 版会嵌入公网 HTTPS 的 PNG、JPEG、GIF 和 WebP；浏览器版受图片服务器
-              CORS 策略限制。下载失败或不支持的图片会保留明显占位。
-            </p>
-            <p>Windows 和 Android 版先保存文档，再粘贴截图或从“更多”→“插入本地图片”选择 PNG、JPEG、GIF、WebP（每图最多 32 MiB），附件会自动存入文档旁的 <code>assets</code> 文件夹。</p>
+            <p>“导出全文图片”会预览导出进度，一页保存 PNG，长文多页打包 ZIP；最终写入前可以取消。</p>
+            <p>“更多”→“插入本地图片”支持 PNG、JPEG、GIF、WebP（每图最多 32 MiB），也可直接粘贴截图。TextPack 将图片保存在文件内；Windows 和 Android 的普通 Markdown 需先保存，图片存入文档旁的 <code>assets</code> 文件夹。</p>
             <p>Windows 会自动显示文档目录内的相对图片。Android 先用“更多”→“关联图片文件夹”授权文档所在目录，需要所用文件管理器支持目录访问。</p>
-            <p>本地图片暂不支持 SVG、绝对路径和 <code>../</code> 越级路径。另存到其他目录时，请一同复制 <code>assets</code> 等图片附件。</p>
+            <p>本地图片暂不支持 SVG、绝对路径和 <code>../</code> 越级路径。普通 Markdown 另存到其他目录时，请一同复制 <code>assets</code> 等图片附件；TextPack 会保留包内图片。</p>
           </section>
 
           <section class="help-section" aria-labelledby="helpViewsTitle">
@@ -243,6 +259,10 @@
           </section>
         </div>
       </div>
+      <footer class="help-dialog-actions">
+        <label class="help-startup-option" for="hideStartupHelp"><input id="hideStartupHelp" type="checkbox">下次不再展示</label>
+        <button id="helpDoneButton" type="button">关闭</button>
+      </footer>
     </div>
   </dialog>
 

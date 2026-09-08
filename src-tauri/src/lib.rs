@@ -1,6 +1,7 @@
 mod atomic_save;
 mod document_media;
 mod recent_files;
+mod windows_associations;
 
 use std::{
     env, fs,
@@ -26,7 +27,7 @@ fn is_supported_markdown_path(path: &Path) -> bool {
         .map(|extension| {
             matches!(
                 extension.to_ascii_lowercase().as_str(),
-                "md" | "markdown" | "mdown" | "mkd" | "txt"
+                "md" | "markdown" | "mdown" | "mkd" | "txt" | "textpack"
             )
         })
         .unwrap_or(false)
@@ -40,14 +41,12 @@ fn resolve_initial_file_path(path: &Path) -> Result<Option<PathBuf>, std::io::Er
     fs::canonicalize(path).map(Some)
 }
 
-/// Atomically writes UTF-8 text to a desktop path that was authorized by the
-/// file dialog or startup-file flow. Android document URIs are written through
-/// tauri-plugin-fs on the frontend instead.
-#[tauri::command]
-async fn write_text_file_atomic(
+/// Both text and archive writes use the same authorized, atomic save path.
+/// Android document URIs are written through tauri-plugin-fs on the frontend.
+async fn write_authorized_file_atomic(
     app: tauri::AppHandle,
     path: PathBuf,
-    content: String,
+    content: Vec<u8>,
 ) -> Result<(), String> {
     if !path.is_absolute() {
         return Err("拒绝保存到非绝对路径".to_string());
@@ -57,11 +56,28 @@ async fn write_text_file_atomic(
     }
 
     tauri::async_runtime::spawn_blocking(move || {
-        atomic_save::write_atomic(&path, content.as_bytes())
-            .map_err(|error| format!("保存文件失败：{error}"))
+        atomic_save::write_atomic(&path, &content).map_err(|error| format!("保存文件失败：{error}"))
     })
     .await
     .map_err(|error| format!("保存任务失败：{error}"))?
+}
+
+#[tauri::command]
+async fn write_text_file_atomic(
+    app: tauri::AppHandle,
+    path: PathBuf,
+    content: String,
+) -> Result<(), String> {
+    write_authorized_file_atomic(app, path, content.into_bytes()).await
+}
+
+#[tauri::command]
+async fn write_binary_file_atomic(
+    app: tauri::AppHandle,
+    path: PathBuf,
+    content: Vec<u8>,
+) -> Result<(), String> {
+    write_authorized_file_atomic(app, path, content).await
 }
 
 #[tauri::command]
@@ -114,6 +130,7 @@ pub fn run() {
             get_initial_file,
             take_opened_urls,
             write_text_file_atomic,
+            write_binary_file_atomic,
             document_media::read_local_image,
             document_media::write_document_image,
             document_media::link_image_folder,
@@ -123,7 +140,9 @@ pub fn run() {
             recent_files::remember_recent_file,
             recent_files::authorize_recent_file,
             recent_files::forget_recent_file,
-            recent_files::clear_recent_files
+            recent_files::clear_recent_files,
+            windows_associations::register_windows_file_associations,
+            windows_associations::open_windows_default_apps
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -157,6 +176,8 @@ mod tests {
             "draft.mdown",
             "draft.MKD",
             "plain.txt",
+            "图文笔记.textpack",
+            "NOTE.TEXTPACK",
         ] {
             assert!(is_supported_markdown_path(Path::new(path)), "{path}");
         }
@@ -164,7 +185,14 @@ mod tests {
 
     #[test]
     fn rejects_paths_without_a_supported_extension() {
-        for path in ["notes", "notes.html", "notes.md.exe", ".md"] {
+        for path in [
+            "notes",
+            "notes.html",
+            "notes.md.exe",
+            ".md",
+            "archive.zip",
+            ".textpack",
+        ] {
             assert!(!is_supported_markdown_path(Path::new(path)), "{path}");
         }
     }
@@ -183,5 +211,23 @@ mod tests {
             .expect("supported file should resolve");
         assert!(resolved.is_absolute());
         assert_eq!(resolved.file_name(), relative_path.file_name());
+    }
+
+    #[test]
+    fn resolves_a_textpack_initial_file_and_preserves_its_bytes() {
+        let relative_name = format!(".initial-file-path-test-{}.textpack", process::id());
+        let relative_path = Path::new(&relative_name);
+        let bytes = [0x50, 0x4b, 0x03, 0x04, 0, 0xff, 0x80];
+        fs::write(relative_path, bytes).expect("create binary test file");
+
+        let result = resolve_initial_file_path(relative_path);
+        let resolved = result
+            .expect("resolve TextPack file")
+            .expect("TextPack should resolve");
+        let actual = fs::read(&resolved).expect("read binary test file");
+        let _ = fs::remove_file(relative_path);
+
+        assert!(resolved.is_absolute());
+        assert_eq!(actual, bytes);
     }
 }

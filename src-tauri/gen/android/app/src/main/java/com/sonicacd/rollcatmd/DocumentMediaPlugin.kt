@@ -7,9 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.provider.OpenableColumns
-import android.content.pm.PackageManager
-import android.os.Process
 import android.util.Base64
 import androidx.activity.result.ActivityResult
 import androidx.core.content.FileProvider
@@ -45,13 +42,7 @@ class DocumentMediaPlugin(private val activity: Activity) : Plugin(activity) {
   private data class Child(val uri: Uri, val id: String, val name: String, val mime: String)
 
   private fun verifyReadableDocument(uri: Uri) {
-    require(uri.scheme == "content" && activity.checkUriPermission(uri, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
-      "文件读取权限已过期，请通过打开按钮重新选择"
-    }
-    val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-      if (cursor.moveToFirst()) cursor.getString(0) else null
-    } ?: throw IllegalStateException("文件已移动或不可访问")
-    require(name.substringAfterLast('.', "").lowercase() in setOf("md", "markdown", "mdown", "mkd", "txt")) { "请选择 Markdown 或文本文件" }
+    DocumentIntentPolicy.verifyReadableDocument(activity, uri)
   }
 
   private fun recentPaths(): MutableList<String> {
@@ -64,7 +55,9 @@ class DocumentMediaPlugin(private val activity: Activity) : Plugin(activity) {
     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
       .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
     intent.type = "*/*"
-    intent.putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/plain", "text/markdown", "text/x-markdown", "application/octet-stream"))
+    // Providers may identify TextPack by its dedicated type, ZIP container, or
+    // generic binary type. verifyReadableDocument still requires its extension.
+    intent.putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/plain", "text/markdown", "text/x-markdown", "application/octet-stream", "application/zip", "application/x-zip-compressed", "application/x-textpack"))
     activity.runOnUiThread { startActivityForResult(invoke, intent, "documentSelected") }
   }
 
@@ -75,8 +68,7 @@ class DocumentMediaPlugin(private val activity: Activity) : Plugin(activity) {
       try {
         val uri = result.data?.data ?: throw IllegalStateException("文件选择没有返回路径")
         verifyReadableDocument(uri)
-        val flags = result.data!!.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        resolver.takePersistableUriPermission(uri, flags)
+        DocumentIntentPolicy.retainOfferedPermission(activity, result.data!!, uri)
         invoke.resolve(JSObject().put("path", uri.toString()))
       } catch (error: Exception) { invoke.reject(error.message ?: "打开文档失败") }
     }

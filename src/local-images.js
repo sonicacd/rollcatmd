@@ -32,6 +32,28 @@ function decodeImage(result) {
   return new Blob([Uint8Array.from(binary, (character) => character.charCodeAt(0))], { type: result.mime });
 }
 
+/** Read an attachment as bytes for packaging, without creating a display URL. */
+export async function readDocumentImageBlob(source, { documentPath, invoke, signal } = {}) {
+  aborted(signal);
+  if (!documentPath) throw new Error('请先打开或保存文档，以确定图片所属目录');
+  if (!isRelativeImageSource(source)) throw new Error('本地图片须使用文档内的相对路径');
+  const call = await nativeInvoke(invoke);
+  aborted(signal);
+  const result = await call('read_local_image', { documentPath, source });
+  aborted(signal);
+  return decodeImage(result);
+}
+
+async function readImageBlob(source, { readImage, ...options }) {
+  if (!readImage) return readDocumentImageBlob(source, options);
+  aborted(options.signal);
+  const blob = await readImage(source);
+  aborted(options.signal);
+  if (!(blob instanceof Blob) || !IMAGE_TYPES.has(blob.type)) throw new Error('本地图片响应格式无效');
+  if (blob.size > MAX_LOCAL_IMAGE_BYTES) throw new Error('每张图片最多 32 MiB');
+  return blob;
+}
+
 function markFailure(image, error, replaceFailed) {
   const message = String(error?.message || error);
   if (replaceFailed && image.ownerDocument?.createElement && image.replaceWith) {
@@ -58,7 +80,7 @@ function clearFailure(image) {
 
 /** Hydrate an export clone. Keep returned URLs alive until image rendering ends. */
 export async function inlineLocalImages(root, {
-  documentPath, invoke, signal, replaceFailed = true,
+  documentPath, invoke, readImage, signal, replaceFailed = true,
   createObjectURL = (blob) => URL.createObjectURL(blob),
   revokeObjectURL = (url) => URL.revokeObjectURL(url)
 } = {}) {
@@ -76,12 +98,10 @@ export async function inlineLocalImages(root, {
   let includedImages = 0;
   let failedImages = 0;
   try {
-    const call = groups.size && documentPath ? await nativeInvoke(invoke) : null;
     for (const [source, matches] of groups) {
       aborted(signal);
       try {
-        if (!documentPath) throw new Error('请先打开或保存文档，以确定图片所属目录');
-        const blob = decodeImage(await call('read_local_image', { documentPath, source }));
+        const blob = await readImageBlob(source, { documentPath, invoke, readImage, signal });
         aborted(signal);
         const url = createObjectURL(blob);
         urls.push(url);
@@ -95,6 +115,7 @@ export async function inlineLocalImages(root, {
         includedImages += matches.length;
       } catch (error) {
         aborted(signal);
+        if (error?.name === 'AbortError') throw error;
         failedImages += matches.length;
         failures.push({ source, reason: String(error?.message || error), occurrences: matches.length });
         for (const image of matches) markFailure(image, error, replaceFailed);
@@ -108,14 +129,12 @@ export const resolveLocalImages = inlineLocalImages;
 
 /** Watches a live reading/editor view. Dispose before changing documentPath. */
 export function hydrateLocalImages(root, {
-  documentPath, invoke, signal, onError,
+  documentPath, invoke, readImage, signal, onError,
   createObjectURL = (blob) => URL.createObjectURL(blob),
   revokeObjectURL = (url) => URL.revokeObjectURL(url)
 } = {}) {
   const controller = new AbortController();
-  const forwardAbort = () => controller.abort();
-  if (signal?.aborted) forwardAbort();
-  else signal?.addEventListener('abort', forwardAbort, { once: true });
+  const forwardAbort = () => release();
   const cache = new Map();
   const visited = new WeakMap();
   const urls = new Map();
@@ -134,10 +153,8 @@ export function hydrateLocalImages(root, {
       if (!isRelativeImageSource(source) || visited.get(image) === source) continue;
       visited.set(image, source);
       try {
-        if (!documentPath) throw new Error('请先打开或保存文档，以确定图片所属目录');
         if (!cache.has(source)) cache.set(source, (async () => {
-          const call = await nativeInvoke(invoke);
-          const blob = decodeImage(await call('read_local_image', { documentPath, source }));
+          const blob = await readImageBlob(source, { documentPath, invoke, readImage, signal: controller.signal });
           aborted(controller.signal);
           const url = createObjectURL(blob);
           if (urls.has(source)) revokeObjectURL(urls.get(source));
@@ -154,7 +171,8 @@ export function hydrateLocalImages(root, {
         clearFailure(image);
         image.setAttribute('src', url);
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || error?.name === 'AbortError') { release(); return; }
+        if (sourceOf(image) !== source || (root.contains && !root.contains(image))) continue;
         markFailure(image, error, false);
         onError?.({ source, error });
       }
@@ -172,7 +190,6 @@ export function hydrateLocalImages(root, {
   };
   const observer = typeof MutationObserver === 'function' ? new MutationObserver(schedule) : null;
   observer?.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
-  pending = scan();
   const release = () => {
     disposed = true;
     controller.abort();
@@ -183,6 +200,9 @@ export function hydrateLocalImages(root, {
     for (const url of urls.values()) revokeObjectURL(url);
     urls.clear();
   };
+  if (signal?.aborted) forwardAbort();
+  else signal?.addEventListener('abort', forwardAbort, { once: true });
+  pending = scan();
   release.ready = pending;
   release.refresh = () => { cache.clear(); for (const image of root.querySelectorAll('img')) visited.delete(image); schedule(); };
   return release;

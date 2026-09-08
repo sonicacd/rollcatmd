@@ -3,7 +3,8 @@ const SUPPORTED_DOCUMENT_EXTENSIONS = new Set([
   'markdown',
   'mdown',
   'mkd',
-  'txt'
+  'txt',
+  'textpack'
 ]);
 
 export function isSupportedDroppedFilePath(filePath) {

@@ -1,6 +1,6 @@
 {
   "name": "rollcat-md",
-  "version": "0.4.0",
+  "version": "0.5.2",
   "description": "rollcat-md — a lightweight Markdown reader and editor for Windows and Android.",
   "author": "sonicacd",
   "license": "Apache-2.0",
@@ -24,7 +24,14 @@
     "dev:android": "tauri android dev",
     "dist": "tauri build --no-bundle",
     "dist:win": "tauri build --no-bundle",
-    "dist:android": "tauri android build --apk --target aarch64"
+    "icons:android": "node scripts/sync-android-icons.mjs",
+    "predist:android": "npm run icons:android",
+    "dist:android": "tauri android build --apk --target aarch64",
+    "test:browser": "node scripts/qa-textpack-browser.mjs",
+    "test:clipboard": "node scripts/qa-web-clipboard.mjs",
+    "test:paste-races": "node scripts/qa-paste-races.mjs",
+    "test:windows": "node scripts/qa-windows-integration.mjs",
+    "test:help": "node scripts/qa-startup-help.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",
@@ -41,7 +48,8 @@
     "@toast-ui/editor": "3.2.2",
     "dompurify": "3.4.12",
     "fflate": "^0.8.3",
-    "html-to-image": "^1.11.13"
+    "html-to-image": "^1.11.13",
+    "prosemirror-model": "1.25.10"
   },
   "overrides": {
     "dompurify": "3.4.12"

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDraftPersistence, createWorkspaceController } from '../src/workspace-controller.js';
+import { addTextPackImage, createTextPack, readTextPackImage } from '../src/textpack.js';
 
 function deferred() {
   let resolve, reject;
@@ -161,6 +162,46 @@ test('beforeDocumentChange captures the old text immediately and flush waits for
   gate.resolve(); await Promise.all([pending, closing]);
   assert.equal(f.history.drafts.get('draft-1').content, oldText);
   assert.equal(f.history.drafts.has('draft-2'), false);
+});
+
+test('TextPack recovery checkpoints retain binary attachments through structured cloning and document changes', async () => {
+  const pngBytes = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const { textPack, relativePath } = await addTextPackImage(createTextPack(), new Blob([pngBytes], { type: 'image/png' }));
+  const f = fixture({ dirty: true }), gate = deferred();
+  const originalSave = f.history.saveDraft;
+  // IndexedDB clones typed arrays when writing and when reading records.
+  f.history.saveDraft = async (record) => {
+    const persisted = structuredClone(record);
+    await gate.promise;
+    return originalSave(persisted);
+  };
+  f.history.listDrafts = async () => structuredClone([...f.history.drafts.values()]);
+  f.state.context = { ...f.state.context, filePath: '/with-images.textpack', name: 'with-images.textpack', textPack };
+  f.state.text = `# 待恢复\n\n![图片](${relativePath})`;
+  const originalContent = f.state.text;
+  const checkpoint = f.controller.beforeDocumentChange();
+  f.state.context = { ...f.state.context, documentId: 2, draftId: 'draft-2', isDirty: false, filePath: '/other.md', textPack: null };
+  f.state.text = 'other document';
+  await tick();
+  gate.resolve(); await checkpoint;
+
+  const stored = f.history.drafts.get('draft-1');
+  assert.equal(stored.content, originalContent);
+  assert.equal(stored.filePath, '/with-images.textpack');
+  assert.ok(stored.textPack.files[relativePath] instanceof Uint8Array);
+  assert.notEqual(stored.textPack.files[relativePath], textPack.files[relativePath]);
+  assert.equal(f.history.drafts.has('draft-2'), false);
+
+  let restored;
+  f.api.restoreDraft = (record) => { restored = record; };
+  await f.controller.showDrafts();
+  await f.$('draftsList').children[0].querySelector('.document-list-main').onclick();
+  assert.equal(restored.content, originalContent);
+  const restoredImage = await readTextPackImage(restored.textPack, relativePath);
+  assert.deepEqual(new Uint8Array(await restoredImage.arrayBuffer()), pngBytes);
+  // Mutating a newly restored session cannot corrupt the stored recovery copy.
+  restored.textPack.files[relativePath][0] = 0;
+  assert.deepEqual(stored.textPack.files[relativePath], pngBytes);
 });
 
 test('save prompt locks all choices during save and only one pending leave action proceeds', async () => {

@@ -17,7 +17,10 @@ test('recognizes Android and iOS document URIs without misclassifying desktop pa
 
 test('opened document URIs require a save destination before they can be overwritten', () => {
   assert.equal(canOverwriteOpenedFile('content://provider/document/notes.md'), false);
+  assert.equal(canOverwriteOpenedFile('content://provider/document/notes.textpack'), false);
+  assert.equal(canOverwriteOpenedFile('file:///storage/notes.textpack'), false);
   assert.equal(canOverwriteOpenedFile('C:\\notes\\draft.md'), true);
+  assert.equal(canOverwriteOpenedFile('C:\\notes\\draft.textpack'), true);
   assert.equal(canOverwriteOpenedFile(null), false);
 });
 
@@ -83,5 +86,45 @@ test('keeps atomic replacement for ordinary desktop paths', async () => {
     'invoke',
     'write_text_file_atomic',
     { path: 'C:\\notes\\draft.md', content: 'desktop' }
+  ]]);
+});
+
+test('writes TextPack bytes to document URIs without UTF-8 encoding or including unrelated buffer data', async () => {
+  for (const filePath of [
+    'content://provider/document/notes.textpack',
+    'file:///storage/notes.textpack'
+  ]) {
+    const calls = [];
+    const content = new Uint8Array([99, 0x50, 0x4b, 0, 0xff, 0x80, 99]).subarray(1, 6);
+
+    const route = await writeNativeDocument({
+      filePath,
+      content,
+      writeFile: async (...args) => calls.push(args),
+      invoke: async () => assert.fail('document URIs must use the filesystem plugin')
+    });
+
+    assert.equal(route, 'document-uri');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][0], filePath);
+    assert.deepEqual([...calls[0][1]], [0x50, 0x4b, 0, 0xff, 0x80]);
+  }
+});
+
+test('writes binary desktop documents through authorized atomic replacement', async () => {
+  const calls = [];
+  const content = new Uint8Array([99, 0x50, 0x4b, 0, 0xff, 0x80, 99]).subarray(1, 6);
+
+  const route = await writeNativeDocument({
+    filePath: 'C:\\notes\\draft.textpack',
+    content,
+    writeFile: async () => assert.fail('native paths must use atomic replacement'),
+    invoke: async (...args) => calls.push(args)
+  });
+
+  assert.equal(route, 'atomic-path');
+  assert.deepEqual(calls, [[
+    'write_binary_file_atomic',
+    { path: 'C:\\notes\\draft.textpack', content: [0x50, 0x4b, 0, 0xff, 0x80] }
   ]]);
 });

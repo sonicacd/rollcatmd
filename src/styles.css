@@ -479,6 +479,8 @@ button, select, summary {
   left: 0;
   width: 262px;
   padding: 7px;
+  max-height: calc(100dvh - 120px);
+  overflow-y: auto;
 }
 .menu-label {
   display: block;
@@ -506,7 +508,7 @@ button, select, summary {
   background: var(--active-bg);
   color: var(--active-text);
 }
-.more-panel button[hidden] {
+.more-panel [hidden] {
   display: none;
 }
 .more-panel :is(kbd, .menu-hint) {
@@ -1152,7 +1154,7 @@ html[data-outline-enabled="false"] .main-area {
 
 .help-dialog-frame {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: inherit;
   overflow: hidden;
 }
@@ -1210,6 +1212,46 @@ html[data-outline-enabled="false"] .main-area {
   padding: 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.help-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 17px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-raised);
+}
+.help-startup-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.help-startup-option input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-strong);
+}
+.help-dialog-actions button {
+  min-width: 80px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: var(--text-strong);
+  cursor: pointer;
+  font: inherit;
+}
+.help-dialog-actions button:hover {
+  background: var(--button-hover-bg);
+}
+.help-section-wide {
+  grid-column: 1 / -1;
 }
 
 .help-dialog-summary {

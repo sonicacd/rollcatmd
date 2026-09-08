@@ -8,6 +8,10 @@ const packageJson = JSON.parse(
 const androidConfig = JSON.parse(
   readFileSync(new URL('../src-tauri/tauri.android.conf.json', import.meta.url), 'utf8')
 );
+const androidManifest = readFileSync(
+  new URL('../src-tauri/gen/android/app/src/main/AndroidManifest.xml', import.meta.url),
+  'utf8'
+);
 const capabilities = JSON.parse(
   readFileSync(new URL('../src-tauri/capabilities/default.json', import.meta.url), 'utf8')
 );
@@ -38,15 +42,40 @@ test('defines a valid Android identity and APK build command', () => {
   assert.match(packageJson.scripts['dist:android'], /--target aarch64/);
 });
 
-test('registers Markdown and text files with Android', () => {
-  const associations = androidConfig.bundle.fileAssociations;
-  assert.deepEqual(
-    associations.map(({ mimeType }) => mimeType),
-    ['text/markdown', 'text/plain']
-  );
-  assert.ok(associations.every(({ androidIntentActionFilters }) =>
-    androidIntentActionFilters.includes('view')
-  ));
+test('keeps Android MIME filters outside the Tauri generated association block', () => {
+  assert.deepEqual(androidConfig.bundle.fileAssociations, []);
+  const marker = '<!-- tauri-file-associations. AUTO-GENERATED. DO NOT REMOVE. -->';
+  const [, generated, manual] = androidManifest.split(marker);
+  assert.equal(generated.trim(), '');
+  assert.ok(manual.includes('android.intent.action.VIEW'));
+  assert.ok(manual.includes('android.intent.action.SEND'));
+});
+
+test('separates VIEW and SEND and limits wildcard MIME to filename-bearing content URIs', () => {
+  const filters = [...androidManifest.matchAll(/<intent-filter>([\s\S]*?)<\/intent-filter>/g)]
+    .map(([, filter]) => filter)
+    .filter((filter) => /android.intent.action.(?:VIEW|SEND)/.test(filter));
+  const documentMimes = ['text/markdown', 'text/x-markdown', 'text/plain', 'application/x-textpack',
+    'application/octet-stream', 'application/zip', 'application/x-zip-compressed'];
+  assert.equal(filters.length, 4);
+  for (const action of ['VIEW', 'SEND']) {
+    const mimeFilter = filters.find((filter) => filter.includes(`android.intent.action.${action}`)
+      && !filter.includes('android:scheme'));
+    assert.ok(mimeFilter, action);
+    assert.equal((mimeFilter.match(/<action /g) || []).length, 1);
+    for (const mime of documentMimes) assert.ok(mimeFilter.includes(`android:mimeType="${mime}"`), mime);
+    assert.doesNotMatch(mimeFilter, /android:mimeType="\*\/\*"|android:path/);
+  }
+  for (const filter of filters.filter((filter) => filter.includes('android:scheme'))) {
+    assert.ok(filter.includes('android:scheme="content" android:host="*"'));
+    assert.ok(filter.includes('android.intent.action.VIEW'));
+    assert.doesNotMatch(filter, /android.intent.action.SEND/);
+    for (const extension of ['md', 'markdown', 'mdown', 'mkd', 'txt', 'textpack']) {
+      assert.ok(filter.includes(`android:pathSuffix=".${extension}"`), extension);
+      assert.ok(filter.includes(`android:pathPattern=".*\\\\.${extension}"`), extension);
+    }
+  }
+  assert.doesNotMatch(androidManifest, /android.intent.action.SEND_MULTIPLE|android:pathSuffix="\.zip"/);
 });
 
 test('uses the Tauri mobile library entry point', () => {

@@ -8,13 +8,15 @@ import {
   selectDroppedDocumentPath
 } from '../src/file-drop.js';
 
-test('recognizes supported Markdown and text file paths case-insensitively', () => {
+test('recognizes supported Markdown, text, and TextPack paths case-insensitively', () => {
   for (const filePath of [
     'C:\\notes\\draft.md',
     'C:\\notes\\README.MARKDOWN',
     '/home/user/draft.mdown',
     '/home/user/draft.MKD',
-    '/home/user/plain.txt'
+    '/home/user/plain.txt',
+    'C:\\notes\\图文笔记.textpack',
+    '/home/user/NOTE.TEXTPACK'
   ]) {
     assert.equal(isSupportedDroppedFilePath(filePath), true, filePath);
   }
@@ -27,7 +29,9 @@ test('rejects empty, extensionless, hidden-extension, and unsupported paths', ()
     'C:\\notes\\draft',
     'C:\\notes\\draft.md.exe',
     '/home/user/.md',
-    '/home/user/page.html'
+    '/home/user/page.html',
+    '/home/user/archive.zip',
+    '/home/user/.textpack'
   ]) {
     assert.equal(isSupportedDroppedFilePath(filePath), false, String(filePath));
   }
@@ -41,6 +45,11 @@ test('selects the first supported document from a mixed drop', () => {
   ]), 'C:\\notes\\first.md');
   assert.equal(selectDroppedDocumentPath(['C:\\notes\\image.png']), null);
   assert.equal(selectDroppedDocumentPath(null), null);
+  assert.equal(selectDroppedDocumentPath([
+    'C:\\notes\\archive.zip',
+    'C:\\notes\\笔记.textpack',
+    'C:\\notes\\second.md'
+  ]), 'C:\\notes\\笔记.textpack');
 });
 
 test('only completed native drops open a document', async () => {

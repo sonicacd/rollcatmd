@@ -16,6 +16,7 @@ import {
   lineNumbers
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
+import { Slice } from 'prosemirror-model';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -70,6 +71,8 @@ import {
   replaceAllText
 } from './find-replace.js';
 import { registerNativeFileDrop } from './file-drop.js';
+import { isTextPackFile, createTextPack, decodeTextPack, encodeTextPack, readTextPackImage, addTextPackImage } from './textpack.js';
+import { importMarkdownToTextPack } from './textpack-import.js';
 import { countTextLines, parseLineNumber } from './go-to-line.js';
 import { captureViewPosition, createViewPositionController } from './view-position.js';
 import { imageDataToUint8Array, imageExportBaseName } from './image-export.js';
@@ -83,6 +86,8 @@ import { createImagePageCollector } from './image-page-collector.js';
 import { throwIfAborted } from './markdown-export-chunks.js';
 import { inlineRemoteImages } from './remote-image-export.js';
 import { createWorkspaceController } from './workspace-controller.js';
+import { initializeWindowsIntegration } from './windows-integration.js';
+import { isStartupHelpHidden, storeStartupHelpHidden } from './startup-help.js';
 import { calloutEditorPlugin } from './editor-callouts.js';
 import { captureSelectedContent, renderSelectedImage } from './selection-image.js';
 import './styles.css';
@@ -170,7 +175,9 @@ const findReplaceElements = {
 
 const helpElements = {
   dialog: document.querySelector('#helpDialog'),
-  closeButton: document.querySelector('#closeHelpButton')
+  closeButton: document.querySelector('#closeHelpButton'),
+  doneButton: document.querySelector('#helpDoneButton'),
+  hideOnStartup: document.querySelector('#hideStartupHelp')
 };
 
 const goToLineElements = {
@@ -186,7 +193,8 @@ const goToLineElements = {
 
 const markdownFilters = [
   { name: 'Markdown 文件', extensions: ['md', 'markdown', 'mdown', 'mkd'] },
-  { name: '文本文件', extensions: ['txt'] }
+  { name: '文本文件', extensions: ['txt'] },
+  { name: 'TextPack 图文文档', extensions: ['textpack'] }
 ];
 
 const browserFileTypes = [
@@ -196,7 +204,8 @@ const browserFileTypes = [
       'text/markdown': ['.md', '.markdown', '.mdown', '.mkd'],
       'text/plain': ['.txt']
     }
-  }
+  },
+  { description: 'TextPack 图文文档', accept: { 'application/zip': ['.textpack'] } }
 ];
 
 const calloutTitles = {
@@ -247,6 +256,7 @@ const state = {
   currentFilePath: null,
   currentFileWritable: false,
   browserFileHandle: null,
+  textPack: null,
   isDirty: false,
   isLargeDocument: false,
   documentByteSize: null,
@@ -270,6 +280,7 @@ let workspaceController = null;
 let allowNativeClose = false;
 let imageHydrationTimer;
 let imageHydrationAbort;
+let webPasteAbort;
 
 const findReplaceState = {
   query: '',
@@ -645,17 +656,18 @@ function getCurrentMarkdown() {
 }
 
 function getDisplayName(filePath) {
-  return getFileDisplayName(filePath);
+  return getFileDisplayName(filePath, state.textPack ? '未命名.textpack' : '未命名.md');
 }
 
 function isTauriRuntime() {
   return Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
 }
 
-function decodeOpenedDocument(bytes) {
-  return decodeUtf8Document(bytes, {
+async function decodeOpenedDocument(bytes, filePath) {
+  if (isTextPackFile(filePath, bytes)) return decodeTextPack(bytes);
+  return { ...decodeUtf8Document(bytes, {
     preserveOriginal: bytes.byteLength < LARGE_DOCUMENT_THRESHOLD_BYTES
-  });
+  }), byteSize: bytes.byteLength, textPack: null };
 }
 
 async function openBrowserFileWithPicker() {
@@ -666,13 +678,12 @@ async function openBrowserFileWithPicker() {
   const file = await handle.getFile();
   setStatus('正在读取文件…');
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const decoded = decodeOpenedDocument(bytes);
+  const decoded = await decodeOpenedDocument(bytes, file.name);
 
   return {
     canceled: false,
     filePath: file.name,
     ...decoded,
-    byteSize: file.size,
     browserFileHandle: handle
   };
 }
@@ -681,7 +692,7 @@ async function openBrowserFileWithInput() {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.md,.markdown,.mdown,.mkd,.txt,text/markdown,text/plain';
+    input.accept = '.md,.markdown,.mdown,.mkd,.txt,.textpack,text/markdown,text/plain,application/zip';
     input.className = 'visually-hidden-file-input';
     document.body.append(input);
 
@@ -731,8 +742,7 @@ async function openBrowserFileWithInput() {
         settle(resolve, {
           canceled: false,
           filePath: file.name,
-          ...decodeOpenedDocument(bytes),
-          byteSize: file.size,
+          ...await decodeOpenedDocument(bytes, file.name),
           browserFileHandle: null
         });
       } catch (error) {
@@ -773,7 +783,7 @@ async function openMarkdownFile() {
   const selected = document.documentElement.classList.contains('android-runtime')
     ? await invoke('open_document_picker')
     : await openDialog({
-    title: '打开 Markdown 文件',
+    title: '打开 Markdown 或 TextPack 文档',
     multiple: false,
     filters: [
       ...markdownFilters,
@@ -792,8 +802,7 @@ async function openMarkdownFile() {
   return {
     canceled: false,
     filePath,
-    ...decodeOpenedDocument(bytes),
-    byteSize: bytes.byteLength
+    ...await decodeOpenedDocument(bytes, filePath)
   };
 }
 
@@ -810,7 +819,7 @@ async function saveBrowserFileWithHandle(handle, content) {
 }
 
 function downloadBrowserFile(filePath, content) {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const blob = new Blob([content], { type: content instanceof Uint8Array ? 'application/zip' : 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -826,33 +835,64 @@ function downloadBrowserFile(filePath, content) {
   };
 }
 
-async function saveBrowserFile({ filePath, content, saveAs, browserFileHandle }) {
+function textPackFileName(filePath) {
+  return `${(filePath || '未命名.md').replace(/\.[^./\\]+$/, '')}.textpack`;
+}
+
+// Materialize the complete output before touching the selected destination.
+async function prepareDocumentSave({ content, textPack, sourcePath, targetName, targetFormat }) {
+  const wantsPack = targetFormat === 'textpack' || isTextPackFile(targetName);
+  if (wantsPack && targetName && !isUriBackedFilePath(targetName) && !isTextPackFile(targetName)) {
+    throw new Error('TextPack 图文文档的文件名须以 .textpack 结尾。');
+  }
+  if (textPack && !wantsPack) throw new Error('图文文档请使用 .textpack 扩展名保存，以保留内置图片。');
+  if (!wantsPack) return { content, serializedContent: content, textPack: null };
+  if (!textPack) {
+    const { readDocumentImageBlob } = await import('./local-images.js');
+    const converted = await importMarkdownToTextPack(content, { readImage: (source) => {
+      if (!isTauriRuntime()) throw new Error('浏览器无法读取 Markdown 旁的图片，请在 Windows 或 Android 版中打包，或先创建 TextPack 再插入图片。');
+      return readDocumentImageBlob(source, { documentPath: sourcePath, invoke });
+    } });
+    textPack = converted.textPack;
+    content = converted.serializedContent;
+  }
+  return { content: await encodeTextPack(textPack, content), serializedContent: content, textPack };
+}
+
+async function saveBrowserFile({ filePath, content, saveAs, browserFileHandle, textPack, sourcePath, targetFormat }) {
+  const prepare = (targetName) => prepareDocumentSave({ content, textPack, sourcePath, targetName, targetFormat });
   if (!saveAs && browserFileHandle?.createWritable) {
-    return saveBrowserFileWithHandle(browserFileHandle, content);
+    const prepared = await prepare(browserFileHandle.name);
+    return { ...await saveBrowserFileWithHandle(browserFileHandle, prepared.content), ...prepared };
   }
 
   if (window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({
-        suggestedName: getDisplayName(filePath || '未命名.md'),
-        types: browserFileTypes
+        suggestedName: textPack || targetFormat === 'textpack' ? textPackFileName(getDisplayName(filePath)) : getDisplayName(filePath),
+        types: textPack || targetFormat === 'textpack' ? browserFileTypes.slice(-1) : browserFileTypes
       });
 
-      return saveBrowserFileWithHandle(handle, content);
+      const prepared = await prepare(handle.name);
+      return { ...await saveBrowserFileWithHandle(handle, prepared.content), ...prepared };
     } catch (error) {
       if (error.name === 'AbortError') {
         return { canceled: true };
       }
 
       if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
-        return downloadBrowserFile(filePath, content);
+        const name = textPack || targetFormat === 'textpack' ? textPackFileName(getDisplayName(filePath)) : filePath;
+        const prepared = await prepare(name);
+        return { ...downloadBrowserFile(name, prepared.content), ...prepared };
       }
 
       throw error;
     }
   }
 
-  return downloadBrowserFile(filePath, content);
+  const name = textPack || targetFormat === 'textpack' ? textPackFileName(getDisplayName(filePath)) : filePath;
+  const prepared = await prepare(name);
+  return { ...downloadBrowserFile(name, prepared.content), ...prepared };
 }
 
 async function saveMarkdownFile({
@@ -860,26 +900,29 @@ async function saveMarkdownFile({
   content,
   saveAs,
   browserFileHandle,
-  fileWritable
+  fileWritable,
+  textPack,
+  sourcePath,
+  targetFormat
 }) {
   if (!isTauriRuntime()) {
     return saveBrowserFile({
       filePath,
       content,
       saveAs,
-      browserFileHandle
+      browserFileHandle,
+      textPack, sourcePath, targetFormat
     });
   }
 
   let targetPath = filePath;
 
   if (!targetPath || saveAs || !fileWritable) {
+    const suggestedPath = targetPath && !isUriBackedFilePath(targetPath) ? targetPath : getDisplayName(targetPath);
     targetPath = await saveDialog({
-      title: '保存 Markdown 文件',
-      defaultPath: targetPath && !isUriBackedFilePath(targetPath)
-        ? targetPath
-        : getDisplayName(targetPath),
-      filters: markdownFilters
+      title: textPack || targetFormat === 'textpack' ? '保存 TextPack 图文文档' : '保存文档',
+      defaultPath: textPack || targetFormat === 'textpack' ? textPackFileName(suggestedPath) : suggestedPath,
+      filters: textPack || targetFormat === 'textpack' ? markdownFilters.slice(-1) : markdownFilters
     });
 
     if (!targetPath) {
@@ -887,13 +930,14 @@ async function saveMarkdownFile({
     }
   }
 
+  const prepared = await prepareDocumentSave({ content, textPack, sourcePath, targetName: targetPath, targetFormat });
   await writeNativeDocument({
     filePath: targetPath,
-    content,
+    content: prepared.content,
     writeFile,
     invoke
   });
-  return { canceled: false, filePath: targetPath, fileWritable: true };
+  return { canceled: false, filePath: targetPath, fileWritable: true, ...prepared };
 }
 
 function imageExportFileType(fileName) {
@@ -1017,6 +1061,7 @@ async function startImageExport() {
   controls.exportImageButton.setAttribute('aria-busy', 'true');
   const fileName = getDisplayName(state.currentFilePath);
   const exportDocumentPath = state.currentFilePath;
+  const exportTextPack = state.textPack;
   let nativeArchive = null;
   let archiveCollector = null;
   let archiveFinished = false;
@@ -1057,7 +1102,7 @@ async function startImageExport() {
           length: documentText.length
         },
         renderChunk: renderImageExportChunk,
-        inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath: exportDocumentPath }),
+        inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath: exportDocumentPath, textPack: exportTextPack }),
         signal: abortController.signal,
         onProgress: reportProgress,
         onPage: archiveCollector ? (blob) => archiveCollector.add(blob) : undefined
@@ -1111,7 +1156,7 @@ async function startImageExport() {
           length: markdown.length
         },
         renderChunk: renderImageExportChunk,
-        inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath: exportDocumentPath }),
+        inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath: exportDocumentPath, textPack: exportTextPack }),
         signal: abortController.signal,
         onProgress: reportProgress,
         onPage: archiveCollector ? (blob) => archiveCollector.add(blob) : undefined
@@ -1223,6 +1268,7 @@ async function openInitialLaunchFile() {
 
     setStatus('正在读取启动文件…');
     const bytes = await readFile(result.filePath);
+    const decoded = await decodeOpenedDocument(bytes, result.filePath);
 
     if (!canApplyOpenRequest(request)) {
       return;
@@ -1230,8 +1276,7 @@ async function openInitialLaunchFile() {
 
     openDocument({
       ...result,
-      ...decodeOpenedDocument(bytes),
-      byteSize: bytes.byteLength
+      ...decoded
     });
   } catch (error) {
     if (!canApplyOpenRequest(request)) {
@@ -1270,6 +1315,7 @@ async function openExternalFileUrls(urls) {
   try {
     setStatus('正在读取外部文件…');
     const bytes = await readFile(filePath);
+    const decoded = await decodeOpenedDocument(bytes, filePath);
 
     if (!canApplyOpenRequest(request)) {
       return false;
@@ -1277,8 +1323,7 @@ async function openExternalFileUrls(urls) {
 
     openDocument({
       filePath,
-      ...decodeOpenedDocument(bytes),
-      byteSize: bytes.byteLength,
+      ...decoded,
       fileWritable: false
     });
     return true;
@@ -1325,6 +1370,7 @@ async function openDroppedFile(filePath) {
   try {
     setStatus('正在读取拖入文件…');
     const bytes = await readFile(filePath);
+    const decoded = await decodeOpenedDocument(bytes, filePath);
 
     if (!canApplyOpenRequest(request)) {
       return false;
@@ -1332,8 +1378,7 @@ async function openDroppedFile(filePath) {
 
     openDocument({
       filePath,
-      ...decodeOpenedDocument(bytes),
-      byteSize: bytes.byteLength
+      ...decoded
     });
     return true;
   } catch (error) {
@@ -1651,11 +1696,13 @@ function setDocument(
     fileWritable = canOverwriteOpenedFile(filePath),
     lineEnding = '\n',
     hasBom = false,
-    originalSerializedContent = null
+    originalSerializedContent = null,
+    textPack = null
   } = {}
 ) {
   workspaceController?.beforeDocumentChange();
   imageHydrationAbort?.abort();
+  webPasteAbort?.abort();
   viewPosition.cancel();
   closeFindReplace({ restoreMode: false, restoreFocus: false });
   const content = normalizeEditorText(markdown || '');
@@ -1669,6 +1716,7 @@ function setDocument(
   state.currentFilePath = filePath;
   state.currentFileWritable = fileWritable;
   state.browserFileHandle = browserFileHandle;
+  state.textPack = textPack;
   state.textFormat = { lineEnding, hasBom };
   // Keep an exact source bypass for Toast UI documents. CodeMirror already
   // preserves large-document text, so retaining another multi-megabyte string
@@ -1716,14 +1764,16 @@ function openDocument({
   fileWritable = canOverwriteOpenedFile(filePath),
   lineEnding = '\n',
   hasBom = false,
-  originalSerializedContent = null
+  originalSerializedContent = null,
+  textPack = null
 }) {
   const isLargeDocument = setDocument(content, filePath, byteSize, {
     browserFileHandle,
     fileWritable,
     lineEnding,
     hasBom,
-    originalSerializedContent
+    originalSerializedContent,
+    textPack
   });
 
   setStatus(`已打开 ${getDisplayName(filePath)}`);
@@ -1746,6 +1796,13 @@ async function newFile() {
   invalidateOpenRequests();
   setDocument('# 未命名笔记\n\n开始写 Markdown...\n', null, 0);
   setStatus('已新建文件');
+}
+
+async function newTextPack() {
+  if (!await confirmDiscardChanges()) return;
+  invalidateOpenRequests();
+  setDocument('# 未命名笔记\n\n开始写 Markdown...\n', null, 0, { textPack: createTextPack(), fileWritable: false });
+  setStatus('已新建 TextPack，可直接粘贴或插入图片，保存时图片会一同写入文档');
 }
 
 async function openFile() {
@@ -1801,7 +1858,10 @@ async function performSave(saveAs, snapshot) {
       content: materialized.serializedContent,
       saveAs,
       browserFileHandle: targetBrowserHandle,
-      fileWritable: targetFileWritable
+      fileWritable: targetFileWritable,
+      textPack: snapshot.textPack,
+      sourcePath: snapshot.filePath,
+      targetFormat: snapshot.targetFormat || (snapshot.textPack ? 'textpack' : null)
     });
     const resultStatus = classifySaveResult(result);
 
@@ -1823,6 +1883,28 @@ async function performSave(saveAs, snapshot) {
       return;
     }
 
+    const hasNewerChanges = !matchesDocumentRevision(snapshot, state);
+    if (!snapshot.textPack && result.textPack) {
+      if (hasNewerChanges) {
+        setStatus(`已打包 ${getDisplayName(result.filePath)}；当前文档有更新，继续保留编辑中的内容`);
+        return;
+      }
+      const mode = state.mode;
+      const position = captureDocumentPosition();
+      state.currentFilePath = result.filePath;
+      setDirty(false);
+      workspaceController?.saved(snapshot);
+      const decoded = decodeUtf8Document(new TextEncoder().encode(result.serializedContent), { preserveOriginal: !state.isLargeDocument });
+      setDocument(decoded.content, result.filePath, utf8ByteLength(result.serializedContent), {
+        ...decoded, textPack: result.textPack, fileWritable: result.fileWritable ?? false,
+        browserFileHandle: result.browserFileHandle ?? null
+      });
+      restoreDocumentPosition(mode, position);
+      void workspaceController?.documentOpened();
+      setStatus(`已保存 ${getDisplayName(result.filePath)}，本地图片已内置`);
+      return;
+    }
+
     state.currentFilePath = result.filePath;
     state.currentFileWritable = result.fileWritable ?? snapshot.fileWritable;
     state.browserFileHandle = result.browserFileHandle || snapshot.browserFileHandle;
@@ -1831,7 +1913,6 @@ async function performSave(saveAs, snapshot) {
     state.lastSavedSerializedContent = state.isLargeDocument
       ? null
       : materialized.serializedContent;
-    const hasNewerChanges = !matchesDocumentRevision(snapshot, state);
     setDirty(hasNewerChanges);
     workspaceController?.saved(snapshot);
     scheduleImageHydration();
@@ -1847,7 +1928,7 @@ async function performSave(saveAs, snapshot) {
   }
 }
 
-function captureSaveSnapshot() {
+function captureSaveSnapshot(_saveAs, targetFormat = null) {
   const hasUnchangedSource =
     state.revision === state.savedRevision &&
     state.lastSavedContent !== null &&
@@ -1864,6 +1945,8 @@ function captureSaveSnapshot() {
     filePath: state.currentFilePath,
     fileWritable: state.currentFileWritable,
     browserFileHandle: state.browserFileHandle,
+    textPack: state.textPack,
+    targetFormat,
     content,
     documentText: state.isLargeDocument ? largeFileEditor.state.doc : null,
     serializedContent: hasUnchangedSource
@@ -1877,12 +1960,12 @@ const enqueueSaveTask = createSnapshotTaskQueue(
   captureSaveSnapshot,
   (snapshot, saveAs) => performSave(saveAs, snapshot),
   {
-    getCoalesceKey: getSaveCoalesceKey
+    getCoalesceKey: (snapshot, saveAs) => `${getSaveCoalesceKey(snapshot, saveAs)}:${snapshot.targetFormat || ''}`
   }
 );
 
-function saveFile(saveAs = false) {
-  return enqueueSaveTask(saveAs);
+function saveFile(saveAs = false, targetFormat = null) {
+  return enqueueSaveTask(saveAs, targetFormat);
 }
 
 function isFindReplaceOpen() {
@@ -2740,12 +2823,14 @@ function openHelp() {
 
   helpReturnFocus = document.activeElement;
   closeFindReplace({ restoreFocus: false });
+  helpElements.hideOnStartup.checked = isStartupHelpHidden();
 
   if (typeof helpElements.dialog.showModal === 'function') {
     helpElements.dialog.showModal();
   } else {
     helpElements.dialog.setAttribute('open', '');
   }
+  helpElements.dialog.querySelector('.help-dialog-content').scrollTop = 0;
 }
 
 function closeHelp() {
@@ -2807,11 +2892,14 @@ function setMode(mode) {
     readerPanel.setAttribute('aria-hidden', 'false');
   } else {
     const releaseSuppression = beginSuppressChanges();
-    showEditorPanel();
-    editor.changeMode(mode);
-    const [root] = getCurrentViewElements();
-    root.focus({ preventScroll: true });
-    releaseSuppression();
+    try {
+      showEditorPanel();
+      // The app restores the viewport itself. Toast UI's cursor mapping can
+      // point past the last source line after inserting adjacent image atoms.
+      editor.changeMode(mode, true);
+      const [root] = getCurrentViewElements();
+      root.focus({ preventScroll: true });
+    } finally { releaseSuppression(); }
   }
 
   updateModeButtons();
@@ -2918,6 +3006,7 @@ goToLineElements.dialog.addEventListener('close', () => {
   }
 });
 helpElements.closeButton.addEventListener('click', closeHelp);
+helpElements.doneButton.addEventListener('click', closeHelp);
 helpElements.dialog.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     event.preventDefault();
@@ -2930,6 +3019,9 @@ helpElements.dialog.addEventListener('click', (event) => {
   }
 });
 helpElements.dialog.addEventListener('close', () => {
+  if (!storeStartupHelpHidden(helpElements.hideOnStartup.checked)) {
+    setStatus('帮助已关闭，暂时无法记住“下次不再展示”的设置。');
+  }
   const returnFocus = helpReturnFocus;
   helpReturnFocus = null;
 
@@ -3091,8 +3183,9 @@ async function openRecentDocument(record) {
     if (permission !== 'granted') throw new Error('没有获得文件读取权限');
     bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer());
   }
+  const decoded = await decodeOpenedDocument(bytes, record.filePath);
   if (!canApplyOpenRequest(request)) return;
-  openDocument({ filePath: record.filePath, ...decodeOpenedDocument(bytes), byteSize: bytes.byteLength,
+  openDocument({ filePath: record.filePath, ...decoded,
     browserFileHandle: record.browserFileHandle, fileWritable: record.fileWritable && canOverwriteOpenedFile(record.filePath) });
 }
 
@@ -3121,24 +3214,28 @@ function scheduleImageHydration() {
     const controller = imageHydrationAbort;
     try {
       const { hydrateLocalImages } = await import('./local-images.js');
+      if (controller.signal.aborted) return;
       const roots = state.isLargeDocument ? [largeFileEditor.dom] : [viewerElement, editor.wwEditor.view.dom, editorElement.querySelector('.toastui-editor-md-preview')].filter(Boolean);
       for (const [root, entry] of imageHydrationReleases) {
-        if (!roots.includes(root) || entry.documentId !== state.documentId || entry.path !== state.currentFilePath) {
+        if (!roots.includes(root) || entry.documentId !== state.documentId || entry.path !== state.currentFilePath || entry.textPack !== state.textPack) {
           entry.release(); imageHydrationReleases.delete(root);
         }
       }
       for (const root of roots) {
         if (imageHydrationReleases.has(root)) continue;
-        const release = hydrateLocalImages(root, { documentPath: state.currentFilePath, invoke, signal: controller.signal });
-        imageHydrationReleases.set(root, { release, documentId: state.documentId, path: state.currentFilePath });
+        const textPack = state.textPack;
+        const release = hydrateLocalImages(root, { documentPath: state.currentFilePath, invoke, signal: controller.signal,
+          readImage: textPack ? (source) => readTextPackImage(textPack, source) : undefined });
+        imageHydrationReleases.set(root, { release, documentId: state.documentId, path: state.currentFilePath, textPack });
       }
     } catch (error) { if (error.name !== 'AbortError') console.warn('加载本地图片失败', error); }
   }, 120);
 }
 
-async function inlineDocumentImages(root, { documentPath = state.currentFilePath, ...options } = {}) {
+async function inlineDocumentImages(root, { documentPath = state.currentFilePath, textPack = state.textPack, ...options } = {}) {
   const { inlineLocalImages } = await import('./local-images.js');
-  const local = await inlineLocalImages(root, { ...options, documentPath, invoke });
+  const local = await inlineLocalImages(root, { ...options, documentPath, invoke,
+    readImage: textPack ? (source) => readTextPackImage(textPack, source) : undefined });
   try {
     const remote = await inlineRemoteImages(root, options);
     return { includedImages: (local.includedImages || 0) + (remote.includedImages || 0),
@@ -3167,10 +3264,11 @@ async function copySelectedImage() {
   }
   const button = document.getElementById('copySelectionImageButton'); button.disabled = true;
   const documentPath = state.currentFilePath;
+  const textPack = state.textPack;
   try {
     setStatus('正在生成选区图片…');
     const { blob, failedImages } = await renderSelectedImage({ ...selection,
-      renderMarkdown: renderImageExportChunk, inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath }) });
+      renderMarkdown: renderImageExportChunk, inlineImages: (root, options) => inlineDocumentImages(root, { ...options, documentPath, textPack }) });
     try {
       const { copyImageBlob } = await import('./local-images.js'); await copyImageBlob(blob, isTauriRuntime() ? { invoke } : {});
       setStatus(`选区图片已复制${failedImages ? `，${failedImages} 张图片未包含` : ''}`);
@@ -3185,21 +3283,36 @@ async function copySelectedImage() {
 
 async function insertDocumentImage(blob) {
   if (state.mode === 'reader') { setStatus('请切换到编辑或源码视图后插入图片。'); return; }
-  if (!state.currentFilePath || !isTauriRuntime()) {
+  const initiatingDocumentId = state.documentId;
+  if (!state.textPack && (!state.currentFilePath || !isTauriRuntime())) {
     if (!isTauriRuntime()) { setStatus('本地附件需要 Windows 或 Android 版，请在原生应用中插入图片。'); return; }
     await saveFile(false);
+    if (state.documentId !== initiatingDocumentId) { setStatus('文档已变化，请重新插入图片。'); return; }
     if (!state.currentFilePath) return;
   }
-  const context = { documentId: state.documentId, revision: state.revision, filePath: state.currentFilePath };
-  const { persistDocumentImage } = await import('./local-images.js');
-  const relativePath = await persistDocumentImage(blob, { documentPath: context.filePath, invoke });
-  if (state.documentId !== context.documentId || state.revision !== context.revision) { setStatus(`图片已保存到 ${relativePath}，文档已变化，请从附件目录重新插入。`); return; }
+  const context = { documentId: state.documentId, revision: state.revision, filePath: state.currentFilePath,
+    browserFileHandle: state.browserFileHandle, textPack: state.textPack };
+  let relativePath;
+  let nextTextPack;
+  if (context.textPack) {
+    const result = await addTextPackImage(context.textPack, blob);
+    relativePath = result.relativePath;
+    nextTextPack = result.textPack;
+  } else {
+    const { persistDocumentImage } = await import('./local-images.js');
+    relativePath = await persistDocumentImage(blob, { documentPath: context.filePath, invoke });
+  }
+  if (state.documentId !== context.documentId || state.revision !== context.revision || state.textPack !== context.textPack
+    || state.currentFilePath !== context.filePath || state.browserFileHandle !== context.browserFileHandle) {
+    setStatus(context.textPack ? '文档已变化，请重新插入图片。' : `图片已保存到 ${relativePath}，文档已变化，请从附件目录重新插入。`); return;
+  }
+  if (nextTextPack) state.textPack = nextTextPack;
   const markdown = `![图片](${relativePath})`;
   if (state.isLargeDocument) {
     largeFileEditor.dispatch(largeFileEditor.state.replaceSelection(markdown)); largeFileEditor.focus();
   } else if (state.mode === 'markdown') { editor.replaceSelection(markdown); editor.focus(); }
   else { editor.exec('addImage', { imageUrl: relativePath, altText: '图片' }); editor.focus(); }
-  scheduleImageHydration(); setStatus('图片已保存到附件目录并插入');
+  scheduleImageHydration(); setStatus(nextTextPack ? '图片已插入，保存文档时会一同写入 TextPack' : '图片已保存到附件目录并插入');
 }
 
 function chooseDocumentImage() {
@@ -3208,13 +3321,86 @@ function chooseDocumentImage() {
   input.click();
 }
 
+function insertPastedMarkdown(markdown, selection) {
+  if (state.isLargeDocument) {
+    largeFileEditor.dispatch({ changes: { from: selection.from, to: selection.to, insert: markdown },
+      selection: { anchor: selection.from + markdown.length }, scrollIntoView: true });
+    largeFileEditor.focus();
+  } else if (state.mode === 'markdown') {
+    editor.replaceSelection(markdown, selection[0], selection[1]);
+    editor.focus();
+  } else {
+    // Parse only the pasted fragment with the installed Toast UI parser. A
+    // ProseMirror transaction keeps surrounding content and undo history.
+    const parser = new editor.toastMark.constructor(markdown, { disallowedHtmlBlockTags: ['br', 'img'], referenceDefinition: true });
+    const model = editor.convertor.toWysiwygModel(parser.getRootNode());
+    editor.setSelection(selection[0], selection[1]);
+    const view = editor.wwEditor.view;
+    const slice = model.childCount === 1 && model.firstChild.type.name === 'paragraph'
+      ? Slice.maxOpen(model.content) : model.slice(0);
+    view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());
+    editor.focus();
+  }
+}
+
+async function pasteWebContent(html) {
+  webPasteAbort?.abort();
+  const controller = new AbortController();
+  webPasteAbort = controller;
+  const context = { documentId: state.documentId, revision: state.revision, mode: state.mode,
+    filePath: state.currentFilePath, browserFileHandle: state.browserFileHandle, textPack: state.textPack };
+  const selection = state.isLargeDocument
+    ? { from: largeFileEditor.state.selection.main.from, to: largeFileEditor.state.selection.main.to }
+    : structuredClone(editor.getSelection());
+  let stagedTextPack = context.textPack || (!context.filePath ? createTextPack() : null);
+  const stillCurrent = () => state.documentId === context.documentId && state.revision === context.revision
+    && state.mode === context.mode && state.textPack === context.textPack
+    && state.currentFilePath === context.filePath && state.browserFileHandle === context.browserFileHandle;
+  try {
+    setStatus('正在粘贴网页内容并保存图片…');
+    const { prepareWebPaste } = await import('./web-paste.js');
+    const { persistDocumentImage } = await import('./local-images.js');
+    const result = await prepareWebPaste(html, {
+      document, signal: controller.signal, nativeRuntime: isTauriRuntime(),
+      sanitizeHTML: (value) => DOMPurify.sanitize(value, { FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'textarea', 'select'] }),
+      storeImage: async (blob) => {
+        if (!stillCurrent()) { controller.abort(); throw new DOMException('文档已变化', 'AbortError'); }
+        if (stagedTextPack) {
+          const added = await addTextPackImage(stagedTextPack, blob);
+          stagedTextPack = added.textPack;
+          return added.relativePath;
+        }
+        if (!isTauriRuntime()) throw new Error('浏览器中请先新建 TextPack，再粘贴内置图片');
+        return persistDocumentImage(blob, { documentPath: context.filePath, invoke, signal: controller.signal });
+      }
+    });
+    if (!stillCurrent() || controller.signal.aborted) {
+      if (state.documentId === context.documentId) setStatus('文档已变化，请重新粘贴网页内容。');
+      return;
+    }
+    if (!result.markdown) { setStatus('剪贴板中没有可粘贴的正文。'); return; }
+    if (stagedTextPack && (context.textPack || result.includedImages > 0)) state.textPack = stagedTextPack;
+    try { insertPastedMarkdown(result.markdown, selection); }
+    catch (error) { if (state.revision === context.revision) state.textPack = context.textPack; throw error; }
+    // Some clipboard fragments contain only an atom; ensure asset changes also
+    // enter the same revision/draft lifecycle when the editor emits no change.
+    if (state.revision === context.revision) noteDocumentChanged();
+    scheduleImageHydration();
+    const savedImages = result.includedImages ? `，${result.includedImages} 张图片已${state.textPack ? '内置' : '保存到附件目录'}` : '';
+    const failedImages = result.failedImages ? `；${result.failedImages} 张图片未能保存，已保留链接或说明` : '';
+    setStatus(`已粘贴网页内容${savedImages}${failedImages}${!context.textPack && state.textPack ? '；文档将保存为 TextPack' : ''}`);
+  } catch (error) {
+    if (state.documentId === context.documentId) setStatus(error.name === 'AbortError' ? '网页粘贴已取消，请重新粘贴。' : `网页粘贴失败：${error.message || error}`);
+  } finally { if (webPasteAbort === controller) webPasteAbort = null; }
+}
+
 workspaceController = createWorkspaceController({
   context: () => ({ ...state, filePath: state.currentFilePath, fileWritable: state.currentFileWritable, name: getDisplayName(state.currentFilePath) }),
   markdown: getCurrentMarkdown, lineSource: currentLineSource, status: setStatus, save: () => saveFile(false),
   capturePosition: captureDocumentPosition, restorePosition: restoreDocumentPosition,
   visibleLine: visibleDocumentLine, navigateHeading: navigateDocumentHeading, openRecent: openRecentDocument,
   restoreDraft(record) {
-    setDocument(record.content, record.filePath, undefined, { ...record.textFormat, fileWritable: false });
+    setDocument(record.content, record.filePath, undefined, { ...record.textFormat, textPack: record.textPack || null, fileWritable: false });
     state.draftId = record.id; state.revision = 1; state.savedRevision = 0; setDirty(true);
     restoreDocumentPosition(record.mode || 'wysiwyg', record.position); workspaceController.changed();
   },
@@ -3224,14 +3410,28 @@ workspaceController = createWorkspaceController({
   clearNative: () => isTauriRuntime() ? invoke('clear_recent_files') : undefined
 });
 workspaceController.init();
+initializeWindowsIntegration({
+  document, nativeRuntime: isTauriRuntime(),
+  platform: navigator.userAgentData?.platform || navigator.platform,
+  invoke, setStatus
+});
 document.getElementById('findButton').addEventListener('click', openFindReplace);
 document.getElementById('insertImageButton').addEventListener('click', chooseDocumentImage);
+document.getElementById('newTextPackButton').addEventListener('click', newTextPack);
+document.getElementById('saveTextPackButton').addEventListener('click', () => saveFile(true, 'textpack'));
 document.getElementById('copySelectionImageButton').addEventListener('pointerdown', rememberImageSelection);
 document.getElementById('copySelectionImageButton').addEventListener('click', copySelectedImage);
 document.addEventListener('selectionchange', rememberImageSelection);
 document.addEventListener('markdown-media-visible', scheduleImageHydration);
 document.addEventListener('paste', (event) => {
   if (!editorPanel.contains(event.target) || state.mode === 'reader') return;
+  if (event.target.closest?.('input, textarea, select')) return;
+  const html = event.clipboardData?.getData('text/html');
+  if (html?.trim()) {
+    event.preventDefault(); event.stopImmediatePropagation();
+    void pasteWebContent(html);
+    return;
+  }
   const image = [...(event.clipboardData?.items || [])].find((item) => item.type.startsWith('image/'))?.getAsFile();
   if (!image) return;
   event.preventDefault(); event.stopImmediatePropagation();
@@ -3240,6 +3440,7 @@ document.addEventListener('paste', (event) => {
 if (document.documentElement.classList.contains('android-runtime')) {
   const folderButton = document.getElementById('linkImageFolderButton'); folderButton.hidden = false;
   folderButton.addEventListener('click', async () => {
+    if (state.textPack) { setStatus('TextPack 的图片随文档保存，可直接插入，无需关联图片文件夹。'); return; }
     if (!state.currentFilePath) { setStatus('请先打开或保存文档，再关联图片文件夹。'); return; }
     try { const result = await invoke('link_image_folder', { documentPath: state.currentFilePath }); if (result.linked) { for (const entry of imageHydrationReleases.values()) entry.release.refresh(); scheduleImageHydration(); setStatus('已关联图片文件夹'); } }
     catch (error) { setStatus(`关联失败：${error.message || error}`); }
@@ -3264,5 +3465,7 @@ renderMobileChrome();
 updateSavingState();
 updateCounts();
 renderFindReplaceState();
-void initializeNativeFileOpenHandling();
+void initializeNativeFileOpenHandling().finally(() => {
+  if (!isStartupHelpHidden()) openHelp();
+});
 void initializeNativeFileDrop();

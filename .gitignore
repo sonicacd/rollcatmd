@@ -3,6 +3,7 @@
 /dist-renderer/
 /src-tauri/target/
 /release/
+/work/
 /.android-toolchain/
 
 # Local development state
