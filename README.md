@@ -2,11 +2,21 @@
   <img src="src/assets/cat-md-icon.png" width="96" height="96" alt="滚猫md 图标">
 </p>
 
-# 滚猫md / rollcat-md
+# 滚猫 md / TumblingCat
 
 一款轻量的 Windows 与 Android Markdown 阅读与编辑软件，支持 TextPack 单文件图文文档、所见即所得、源码编辑、专注阅读，以及面向大文件的可视区分块渲染。
 
 A lightweight Windows and Android Markdown reader and editor with single-file TextPack documents, WYSIWYG editing, source editing, focused reading, and viewport rendering for large files.
+
+**[官网 / Website](https://tumblingcat.com/?utm_source=github&utm_medium=referral&utm_campaign=launch_202609) · [English](https://tumblingcat.com/en/?utm_source=github&utm_medium=referral&utm_campaign=launch_202609) · [下载 / Downloads](https://tumblingcat.com/?utm_source=github&utm_medium=referral&utm_campaign=launch_202609#download) · [Gitee 镜像](https://gitee.com/rhoninarcher/tumblingcatmd)**
+
+![滚猫 md 的 Windows 所见即所得编辑界面 / Actual Windows WYSIWYG editor, shown in Chinese](https://tumblingcat.com/tumblingcat-windows-editor.png)
+
+- **轻便 / Portable** — Windows v0.5.1 EXE 约 6.35 MiB，免安装，依赖系统 WebView2；Android v0.5.2 ARM64 APK 约 10.63 MiB。
+- **图文一起带走 / Keep images with your notes** — TextPack 将 Markdown 与可访问的本地图片放进一个文件。Existing remote images keep their URLs.
+- **本地读写 / Local files** — 无需账号，原文档手动保存；本机恢复草稿提供额外恢复入口。No account required; save the original file manually.
+
+[下载可打开的 TextPack 样例 / Try a TextPack sample](https://tumblingcat.com/samples/tumblingcat-demo.textpack) · [图文分享指南](https://tumblingcat.com/guides/markdown-with-images/) · [Windows 使用指南](https://tumblingcat.com/guides/windows-markdown-editor/) · [Android 使用指南](https://tumblingcat.com/guides/android-markdown-reader/)
 
 [中文说明](#中文说明) · [English Guide](#english-guide) · [更新记录](CHANGELOG.md) · [v0.5.2 发布说明](docs/releases/v0.5.2.md)
 
@@ -16,7 +26,7 @@ A lightweight Windows and Android Markdown reader and editor with single-file Te
 
 ### 直接运行
 
-1. 从 [GitHub Releases](https://github.com/sonicacd/rollcatmd/releases/latest/download/rollcat-md.exe) 下载 `rollcat-md.exe`。
+1. 从 [GitHub Releases](https://github.com/sonicacd/tumblingcatmd/releases/latest/download/rollcat-md.exe) 下载 `rollcat-md.exe`。
 2. 把它放到希望长期保存的位置。
 3. 双击 EXE 即可启动，不需要安装。
 
@@ -41,7 +51,7 @@ Windows 版“更多”菜单提供两个入口：
 
 ### Android 版
 
-从 [GitHub Releases](https://github.com/sonicacd/rollcatmd/releases) 中包含 Android 产物的版本下载 `rollcat-md-android-arm64.apk`。v0.5.2 更新 Android APK，Windows 继续使用 v0.5.1 EXE。
+从 [GitHub Releases](https://github.com/sonicacd/tumblingcatmd/releases) 中包含 Android 产物的版本下载 `rollcat-md-android-arm64.apk`。v0.5.2 更新 Android APK，Windows 继续使用 v0.5.1 EXE。
 
 安装后，可在文件管理器中对 `.md`、`.txt`、`.textpack` 选择“打开方式”→“滚猫md”。应用同时兼容常见 Markdown、文本、TextPack 及通用二进制/ZIP 类型声明，接收后按文件的真实名称检查支持的扩展名。因此部分其他二进制或 ZIP 文件也可能显示滚猫md候选，选择后会提示文件类型不支持。具体入口样式由文件管理器决定。
 
@@ -273,7 +283,7 @@ v0.3.4 已修复网络图片下载成功后仍可能空白的问题。请从 Git
 
 ### Run the EXE
 
-1. Download `rollcat-md.exe` from [GitHub Releases](https://github.com/sonicacd/rollcatmd/releases/latest/download/rollcat-md.exe).
+1. Download `rollcat-md.exe` from [GitHub Releases](https://github.com/sonicacd/tumblingcatmd/releases/latest/download/rollcat-md.exe).
 2. Move it to a location where you want to keep it.
 3. Double-click the EXE to launch it. No installation is required.
 
@@ -298,7 +308,7 @@ Registration points to the full path of the running EXE. Keep the portable EXE i
 
 ### Android
 
-Download `rollcat-md-android-arm64.apk` from a release that includes Android assets on [GitHub Releases](https://github.com/sonicacd/rollcatmd/releases). v0.5.2 updates the Android APK; Windows continues to use the v0.5.1 EXE.
+Download `rollcat-md-android-arm64.apk` from a release that includes Android assets on [GitHub Releases](https://github.com/sonicacd/tumblingcatmd/releases). v0.5.2 updates the Android APK; Windows continues to use the v0.5.1 EXE.
 
 After installation, choose **Open with → 滚猫md** for `.md`, `.txt`, or `.textpack` in your file manager. The app registers common Markdown, text, TextPack, generic binary, and ZIP MIME types, then validates the real display name after receiving a file. Some unrelated binary or ZIP files may also list the app; unsupported extensions are rejected on receipt. The exact chooser UI depends on the file manager.
 
