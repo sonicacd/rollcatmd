@@ -1,5 +1,21 @@
 # 更新记录 / Changelog
 
+## 0.5.3
+
+### 视图切换阅读位置 / Reading Position When Switching Views
+
+- 修复所见即所得切到源码时跳至文末的问题：正确同步编辑器焦点与选区，避免旧光标位置在稍后覆盖当前阅读位置。
+- 修复源码双栏预览的滚动动画再次拉动正文的问题：恢复阅读位置期间暂停同步并取消在途动画，按源码可视区对齐预览，完成或用户操作后恢复同步状态。
+- 增加 10,630 字符、10 张图片的 TextPack 多轮切换回归，以及按钮、快捷键、阅读视图往返、快速切换和取消恢复的检查。本次发布 Windows v0.5.3 EXE 与校验文件；Android 继续使用 v0.5.2 APK。
+
+- Fix jumps to the document end when switching from WYSIWYG to Source by synchronizing editor focus and selection before restoring the reading position.
+- Pause preview scroll synchronization and cancel running animations during restoration. Align the preview with the source viewport, then restore the previous synchronization state on completion or user input.
+- Add repeated view-switch checks using a 10,630-character TextPack with 10 images, plus buttons, shortcuts, Reader round trips, rapid switching, and cancellation. This release ships the Windows v0.5.3 EXE and checksums; Android remains at v0.5.2.
+
+验证结果与平台范围见 [v0.5.3 发布说明](docs/releases/v0.5.3.md)。
+
+See the [v0.5.3 release notes](docs/releases/v0.5.3.md) for validation and platform scope.
+
 ## 0.5.2
 
 ### Android 打开方式与图标 / Android Open With and Icon
