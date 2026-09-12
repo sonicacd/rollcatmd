@@ -560,7 +560,26 @@ const editor = new Editor({
   ]
 });
 
-const viewPosition = createViewPositionController();
+const viewPosition = createViewPositionController({
+  suspendScrollSync() {
+    const active = editor.scrollSync.active;
+    // A previous preview position or animation must not drive the source pane
+    // while the app restores the paragraph currently being read.
+    editor.eventEmitter.emit('toggleScrollSync', false);
+    return () => {
+      // User input or a document change can end restoration during an animation.
+      editor.eventEmitter.emit('toggleScrollSync', false);
+      editor.eventEmitter.emit('toggleScrollSync', active);
+    };
+  },
+  syncScroll() {
+    if (state.mode === 'markdown' && editor.scrollSync.previewEl.clientHeight) {
+      // Keep the preview aligned with the restored source viewport. Cursor-
+      // based synchronization may still refer to an offscreen editing position.
+      editor.scrollSync.syncPreviewScrollTop();
+    }
+  }
+});
 
 let viewer = Editor.factory({
   el: viewerElement,
@@ -2897,8 +2916,10 @@ function setMode(mode) {
       // The app restores the viewport itself. Toast UI's cursor mapping can
       // point past the last source line after inserting adjacent image atoms.
       editor.changeMode(mode, true);
-      const [root] = getCurrentViewElements();
-      root.focus({ preventScroll: true });
+      // ProseMirror must synchronize its DOM selection while taking focus.
+      // Focusing the DOM directly leaves a delayed selectionchange that can
+      // scroll to the old end-of-document cursor after viewport restoration.
+      editor.getCurrentModeEditor().view.focus();
     } finally { releaseSuppression(); }
   }
 

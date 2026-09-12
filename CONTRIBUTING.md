@@ -66,6 +66,7 @@ npm run test:clipboard
 npm run test:paste-races
 npm run test:windows
 npm run test:help
+npm run test:position
 ```
 
 脚本自行启动本地 Vite 服务，退出时关闭服务和隔离浏览器。它们分别覆盖文件往返与草稿恢复、真实 Ctrl+C/Ctrl+V 图文粘贴，以及异步粘贴与保存的竞态。文件选择和原生文件接口使用测试替身；图片请求使用固定样例，截图与日志写入 `work/qa`。原生文件授权、Android 系统文件选择与设备安装仍需单独验证。
@@ -75,6 +76,10 @@ Each script starts and stops its own local Vite server and isolated browser. The
 `test:windows` 验证平台可见性、菜单滚动和模拟 IPC 的成功、失败与重复点击。`test:help` 验证真实 localStorage 下的首次启动、勾选关闭后记忆、手动重开及小窗口布局。Rust 文件关联测试仅写入独立临时注册表子树，不登记正式打开候选或修改当前默认应用。
 
 `test:windows` covers platform visibility, menu scrolling, and mocked IPC success, failure, and duplicate clicks. `test:help` exercises first launch, persisted opt-out after closing, manual reopening, and small-window layout with real localStorage. Rust association tests write only an isolated temporary registry subtree; they do not register production candidates or change current defaults.
+
+`test:position` 验证视图切换后的阅读位置，包括编辑光标留在文末时，通过按钮和快捷键从所见即所得切到源码，以及带图片的 TextPack 文档。
+
+`test:position` checks reading position after view switches, including switching from WYSIWYG to Source with buttons and shortcuts while the editing cursor remains at the end, and TextPack documents with images.
 
 ### 阅读、恢复与附件的开发约定 / Reading, recovery, and attachments
 

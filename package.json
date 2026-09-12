@@ -31,7 +31,8 @@
     "test:clipboard": "node scripts/qa-web-clipboard.mjs",
     "test:paste-races": "node scripts/qa-paste-races.mjs",
     "test:windows": "node scripts/qa-windows-integration.mjs",
-    "test:help": "node scripts/qa-startup-help.mjs"
+    "test:help": "node scripts/qa-startup-help.mjs",
+    "test:position": "node scripts/qa-view-position.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

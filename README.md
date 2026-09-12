@@ -87,7 +87,7 @@ token 数会显示为“约 N tokens”。这是不依赖网络或特定模型�
 
 普通文档的阅读模式会在正文的显式换行处增加留白，方便阅读逐字稿等连续长文，原文内容和换行保持不变。列表、引用和代码块保留原有间距。桌面端三种视图使用紧凑的分段按钮组，文件操作靠左，视图切换与主题控件靠右。
 
-点击视图按钮或使用 `Ctrl+1/2/3` 切换时，会根据当前屏幕上的文字恢复阅读位置，尽量让正在看的段落留在相近位置；文首和文末也会保留。大文档按文档位置恢复。三种视图的换行和排版高度不同，位置可能有少量偏移；缺少可匹配文字时按阅读进度恢复。“跳转到行”仍优先定位到指定行。
+点击视图按钮或使用 `Ctrl+1/2/3` 切换时，会根据当前屏幕上的文字恢复阅读位置，尽量让正在看的段落留在相近位置；文首和文末也会保留。即使编辑光标留在文末，切换到源码也会保持当前阅读位置。大文档按文档位置恢复。三种视图的换行和排版高度不同，位置可能有少量偏移；缺少可匹配文字时按阅读进度恢复。“跳转到行”仍优先定位到指定行。
 
 ### 大纲与继续阅读
 
@@ -344,7 +344,7 @@ WYSIWYG, Reader, and large-document lightweight preview share an Obsidian-inspir
 
 For regular documents, Reader adds breathing room at explicit body-text line breaks to make transcripts and long passages easier to read, while preserving the source text and line breaks. Lists, quotes, and code blocks retain their existing spacing. Desktop views use a compact segmented control, with file actions on the left and view/theme controls on the right.
 
-Switching views with the buttons or `Ctrl+1/2/3` uses the text currently on screen to keep the paragraph being read near its previous screen position, including the start and end of the document. Large documents restore their document position. Different wrapping and layout may cause small shifts; when matching text is unavailable, the app restores relative reading progress. Go to Line continues to prioritize the requested line.
+Switching views with the buttons or `Ctrl+1/2/3` uses the text currently on screen to keep the paragraph being read near its previous screen position, including the start and end of the document. Switching to Source preserves the reading position even when the editing cursor remains at the end of the document. Large documents restore their document position. Different wrapping and layout may cause small shifts; when matching text is unavailable, the app restores relative reading progress. Go to Line continues to prioritize the requested line.
 
 ### Outline and Resuming Documents
 

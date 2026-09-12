@@ -1,5 +1,5 @@
 diff --git a/node_modules/@toast-ui/editor/dist/esm/index.js b/node_modules/@toast-ui/editor/dist/esm/index.js
-index 4cf0107..996473b 100644
+index 4cf0107..be37612 100644
 --- a/node_modules/@toast-ui/editor/dist/esm/index.js
 +++ b/node_modules/@toast-ui/editor/dist/esm/index.js
 @@ -5,6 +5,7 @@
@@ -21,6 +21,39 @@ index 4cf0107..996473b 100644
  
  var CAN_BE_WHITE_TAG_LIST = ['iframe', 'embed'];
  var whiteTagList = [];
+@@ -22092,11 +22095,16 @@ var ScrollSync = /** @class */ (function () {
+         var _this = this;
+         this.eventEmitter.listen('afterPreviewRender', function () {
+             _this.clearTimer();
++            if (!_this.active) {
++                return;
++            }
+             // Immediately after the 'afterPreviewRender' event has occurred,
+             // browser rendering is not yet complete.
+             // So the size of elements can not be accurately measured.
+             _this.timer = setTimeout(function () {
+-                _this.syncPreviewScrollTop(true);
++                if (_this.active) {
++                    _this.syncPreviewScrollTop(true);
++                }
+             }, 200);
+         });
+         this.eventEmitter.listen('scroll', function (type, data) {
+@@ -22111,6 +22119,14 @@ var ScrollSync = /** @class */ (function () {
+         });
+         this.eventEmitter.listen('toggleScrollSync', function (active) {
+             _this.active = active;
++            if (!active) {
++                clearTimeout(currentTimeoutId);
++                currentTimeoutId = null;
++                clearTimeout(releaseTimer);
++                releaseTimer = null;
++                _this.clearTimer();
++                _this.blockedScroll = null;
++            }
+         });
+     };
+     ScrollSync.prototype.getMdNodeAtPos = function (doc, posInfo) {
 diff --git a/node_modules/@toast-ui/editor/dist/esm/indexViewer.js b/node_modules/@toast-ui/editor/dist/esm/indexViewer.js
 index 04474b5..cb5f7ac 100644
 --- a/node_modules/@toast-ui/editor/dist/esm/indexViewer.js

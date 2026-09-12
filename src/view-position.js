@@ -139,12 +139,16 @@ export function captureViewPosition(root, scroller) {
   };
 }
 
-export function createViewPositionController() {
+export function createViewPositionController({
+  suspendScrollSync = () => () => {},
+  syncScroll = () => {}
+} = {}) {
   let cleanup = () => {};
   return {
     cancel() { cleanup(); },
     restore(anchor, root, scroller) {
       cleanup();
+      const resumeScrollSync = suspendScrollSync();
       let stopped = false;
       let frame;
       let timer;
@@ -152,12 +156,14 @@ export function createViewPositionController() {
       const win = root.ownerDocument.defaultView;
       const stopEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
       const stop = () => {
+        if (stopped) return;
         stopped = true;
         win.cancelAnimationFrame(frame);
         win.clearTimeout(timer);
         root.removeEventListener('load', correct, true);
         stopEvents.forEach((type) => win.removeEventListener(type, stop, true));
         cleanup = () => {};
+        resumeScrollSync();
       };
       const correct = () => {
         if (stopped || !root.isConnected) return;
@@ -169,6 +175,7 @@ export function createViewPositionController() {
           const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
           scroller.scrollTop = maximum * (anchor.edge === 'bottom' ? 1 : anchor.scrollRatio);
         }
+        syncScroll();
       };
       cleanup = stop;
       stopEvents.forEach((type) => win.addEventListener(type, stop, { capture: true, passive: true }));

@@ -35,12 +35,14 @@ test('normalization preserves international text and does not split astral lette
 
 function restorationHarness() {
   const frames = new Map();
+  const timers = new Map();
   const listeners = new Map();
   let sequence = 0;
   const win = {
     requestAnimationFrame(fn) { frames.set(++sequence, fn); return sequence; },
     cancelAnimationFrame(id) { frames.delete(id); },
-    setTimeout() { return 1; }, clearTimeout() {},
+    setTimeout(fn) { timers.set(++sequence, fn); return sequence; },
+    clearTimeout(id) { timers.delete(id); },
     addEventListener(type, fn) { listeners.set(type, fn); },
     removeEventListener(type) { listeners.delete(type); }
   };
@@ -51,7 +53,8 @@ function restorationHarness() {
   const scroller = { scrollTop: 450, scrollHeight: 2000, clientHeight: 500 };
   return {
     root, scroller, listeners,
-    flush() { const pending = [...frames.values()]; frames.clear(); pending.forEach((fn) => fn()); }
+    flush() { const pending = [...frames.values()]; frames.clear(); pending.forEach((fn) => fn()); },
+    settle() { const pending = [...timers.values()]; timers.clear(); pending.forEach((fn) => fn()); }
   };
 }
 
@@ -91,4 +94,51 @@ test('only the newest rapid view switch may restore its scroll position', () => 
   h.flush();
   assert.equal(h.scroller.scrollTop, 1500);
   controller.cancel();
+});
+
+test('restoration suspends competing scroll sync and aligns the preview after the source', () => {
+  const h = restorationHarness();
+  let syncActive = true;
+  const positions = [];
+  const controller = createViewPositionController({
+    suspendScrollSync() {
+      const previous = syncActive;
+      syncActive = false;
+      return () => { syncActive = previous; };
+    },
+    syncScroll() {
+      assert.equal(syncActive, false, 'preview must not scroll the source back');
+      positions.push(h.scroller.scrollTop);
+    }
+  });
+  controller.restore({ scrollRatio: 0.4 }, h.root, h.scroller);
+  assert.equal(syncActive, false);
+  h.flush();
+  h.scroller.scrollHeight = 2300;
+  h.flush();
+  assert.deepEqual(positions, [600, 720]);
+  h.settle();
+  assert.equal(syncActive, true);
+});
+
+test('cancellation, user input and rapid switches release scroll sync exactly once', () => {
+  for (const action of ['cancel', 'wheel', 'pointerdown', 'keydown', 'touchstart', 'switch']) {
+    const h = restorationHarness();
+    let suspended = 0;
+    const controller = createViewPositionController({
+      suspendScrollSync() {
+        assert.equal(suspended++, 0, 'the previous restoration must release its pause');
+        return () => { assert.equal(--suspended, 0); };
+      }
+    });
+    controller.restore({ scrollRatio: 0.4 }, h.root, h.scroller);
+    h.flush();
+    if (action === 'cancel') controller.cancel();
+    else if (action === 'switch') controller.restore({ edge: 'top', scrollRatio: 0 }, h.root, h.scroller);
+    else h.listeners.get(action)();
+    h.flush();
+    h.settle();
+    controller.cancel();
+    assert.equal(suspended, 0, action);
+  }
 });
